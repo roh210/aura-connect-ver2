@@ -45,7 +45,14 @@ Thumbs.db
 .vercel
 .turbo
 
-# Developer Documentation (local reference only)
+# Developer Documentation & Learning Guides (local reference only)
 PHASE_*.md
-PHASE_*_DOCUMENTATION.md
+*_LEARNING_GUIDE.md
+*_SUMMARY.md
+SESSION_MANAGEMENT_GUIDE.md
+
+# Test files
+*.test.html
+socket-test.html
+test-server.js
 SETUP_GUIDE.md
