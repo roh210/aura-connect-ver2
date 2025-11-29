@@ -20,6 +20,8 @@ export interface SessionMatched {
   partnerId: string;
   partnerName: string;
   partnerRole: UserRole;
+  roomUrl: string;
+  token: string; // Access token for Daily.co room
 }
 
 export interface ChatMessage {
@@ -65,7 +67,13 @@ export const connectSocket = (
   // Connection events
   socket.on("connect", () => {
     console.log("✅ Socket connected:", socket?.id);
-    socket?.emit("identify", { userId, userName, role });
+    const identifyData = { userId, name: userName, role };
+    console.log("🔵 Emitting identify event with data:", identifyData);
+    socket?.emit("identify", identifyData);
+  });
+
+  socket.on("identified", (data) => {
+    console.log("✅ Server confirmed identification:", data);
   });
 
   socket.on("disconnect", (reason) => {
@@ -127,9 +135,19 @@ export const onQueueUpdate = (callback: (data: QueueUpdate) => void): void => {
 // SENIOR EVENTS
 // ==========================================
 
-export const seniorSetAvailable = (available: boolean): void => {
-  socket?.emit("senior_available", { available });
-  console.log("📤 Emitted: senior_available", { available });
+export const seniorSetAvailable = (
+  available: boolean,
+  userId: string,
+  name: string
+): void => {
+  if (available) {
+    socket?.emit("senior_available", { userId, name });
+    console.log("📤 Emitted: senior_available", { userId, name });
+  } else {
+    // When going offline, we still need to notify backend
+    socket?.emit("senior_unavailable", { userId });
+    console.log("📤 Emitted: senior_unavailable", { userId });
+  }
 };
 
 export const onMatchRequest = (
@@ -194,6 +212,8 @@ export const onSessionMatched = (
       partnerId: data.studentId || data.seniorId,
       partnerName: data.studentName || data.seniorName,
       partnerRole: data.studentId ? "student" : "senior",
+      roomUrl: data.roomUrl,
+      token: data.token, // Backend sends the appropriate token for this user
     });
   });
 };

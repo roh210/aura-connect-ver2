@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSocket } from "@/hooks/useSocket";
 import * as socketService from "@/services/socket.service";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import VoiceCall from "@/components/VoiceCall";
 
 interface Message {
   id: string;
@@ -58,6 +59,24 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Voice call data (roomUrl and token from matched event)
+  const [callData, setCallData] = useState<{
+    roomUrl: string;
+    token: string;
+  } | null>(null);
+
+  // Load call data from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const roomUrl = localStorage.getItem("sessionRoomUrl");
+      const token = localStorage.getItem("sessionToken");
+
+      if (roomUrl && token) {
+        setCallData({ roomUrl, token });
+      }
+    }
+  }, []);
 
   // Timer countdown
   useEffect(() => {
@@ -140,6 +159,12 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     // Emit end_session event to backend
     socket.endSession?.(params.id);
 
+    // Clear session data from localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sessionRoomUrl");
+      localStorage.removeItem("sessionToken");
+    }
+
     toast({
       title: "✅ Session ended",
       description: "Thank you for using Aura Connect",
@@ -149,6 +174,11 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     setTimeout(() => {
       router.push(userRole === "student" ? "/student" : "/senior");
     }, 1500);
+  };
+
+  // Handle when voice call ends - also end the session
+  const handleCallEnd = () => {
+    handleEndSession();
   };
 
   const handleFlagContent = () => {
@@ -270,8 +300,18 @@ export default function SessionPage({ params }: { params: { id: string } }) {
 
         {/* Side Panel */}
         <div className="w-80 space-y-4">
-          {/* Voice Controls */}
-          {isVoiceActive && (
+          {/* Voice Call Component */}
+          {callData && (
+            <VoiceCall
+              roomUrl={callData.roomUrl}
+              token={callData.token}
+              userName={userName}
+              onCallEnd={handleCallEnd}
+            />
+          )}
+
+          {/* Loading placeholder (if no call data yet) */}
+          {!callData && (
             <Card className="bg-gray-800 border-gray-700">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm">
@@ -280,30 +320,9 @@ export default function SessionPage({ params }: { params: { id: string } }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-center py-6">
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
-                      <span className="text-3xl">📞</span>
-                    </div>
+                  <div className="text-center text-gray-400">
+                    <p className="text-sm">Loading voice call...</p>
                   </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setIsMuted(!isMuted)}
-                    variant={isMuted ? "destructive" : "outline"}
-                    className="flex-1"
-                    size="sm"
-                  >
-                    {isMuted ? "🔇 Unmute" : "🔊 Mute"}
-                  </Button>
-                  <Button
-                    onClick={handleToggleVoice}
-                    variant="destructive"
-                    className="flex-1"
-                    size="sm"
-                  >
-                    📵 Hang Up
-                  </Button>
                 </div>
               </CardContent>
             </Card>

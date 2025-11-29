@@ -26,6 +26,15 @@ export default function StudentDashboard() {
   const userId = "demo-student-123";
   const userName = "Demo Student";
 
+  // Save user data to localStorage for session page
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("userId", userId);
+      localStorage.setItem("userName", userName);
+      localStorage.setItem("userRole", "student");
+    }
+  }, []);
+
   const { isConnected, socket } = useSocket(userId, userName, "student");
 
   const [connectionState, setConnectionState] =
@@ -46,6 +55,12 @@ export default function StudentDashboard() {
     // Listen for match notification
     socket.onSessionMatched((data) => {
       setConnectionState("matched");
+
+      // Store session data for voice call
+      if (typeof window !== "undefined" && data.roomUrl && data.token) {
+        localStorage.setItem("sessionRoomUrl", data.roomUrl);
+        localStorage.setItem("sessionToken", data.token);
+      }
 
       toast({
         title: "✅ Match Found!",

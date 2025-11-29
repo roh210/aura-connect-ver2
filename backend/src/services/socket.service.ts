@@ -24,6 +24,7 @@ import {
   handleStudentJoinQueue,
   handleSeniorAccept,
   handleSeniorAvailable,
+  handleSeniorUnavailable,
   handleSessionStart,
   handleDisconnect,
   handleSafetyAlert,
@@ -122,10 +123,13 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
     socket.on(
       "identify",
       (data: { role: string; userId: string; name: string }) => {
-        logger.info("User identified", {
+        logger.info("🔍 Identify event received - RAW DATA:", {
           socketId: socket.id,
+          receivedData: data,
           role: data.role,
           userId: data.userId,
+          name: data.name,
+          hasName: !!data.name,
         });
 
         if (data.role === "student") {
@@ -136,6 +140,12 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
             joinedAt: Date.now(),
             status: "waiting",
           });
+          logger.info("✅ Student added to activeStudents map", {
+            socketId: socket.id,
+            userId: data.userId,
+            name: data.name,
+            totalActiveStudents: activeStudents.size,
+          });
         } else if (data.role === "senior") {
           activeSeniors.set(socket.id, {
             socketId: socket.id,
@@ -143,6 +153,12 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
             name: data.name,
             joinedAt: Date.now(),
             status: "available",
+          });
+          logger.info("✅ Senior added to activeSeniors map", {
+            socketId: socket.id,
+            userId: data.userId,
+            name: data.name,
+            totalActiveSeniors: activeSeniors.size,
           });
         } else if (data.role === "admin") {
           socket.join("admin_room");
@@ -166,6 +182,9 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
      */
     socket.on("senior_available", (data) =>
       handleSeniorAvailable(io, socket, data)
+    );
+    socket.on("senior_unavailable", (data) =>
+      handleSeniorUnavailable(io, socket, data)
     );
     socket.on("senior_accept", (data) => handleSeniorAccept(io, socket, data));
 

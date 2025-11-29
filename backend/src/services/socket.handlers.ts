@@ -78,6 +78,16 @@ export const handleStudentJoinQueue = (
   }
 
   // Broadcast to all available seniors
+  const availableSeniorsRoom =
+    io.sockets.adapter.rooms.get("available_seniors");
+  const seniorCount = availableSeniorsRoom ? availableSeniorsRoom.size : 0;
+
+  logger.info("Broadcasting student_waiting to seniors", {
+    studentId: data.userId,
+    studentName: data.name,
+    availableSeniors: seniorCount,
+  });
+
   io.to("available_seniors").emit("student_waiting", {
     studentId: data.userId,
     studentName: data.name,
@@ -127,6 +137,11 @@ export const handleSeniorAvailable = (
   // Join available seniors room
   socket.join("available_seniors");
 
+  logger.info("Senior joined available_seniors room", {
+    socketId: socket.id,
+    userId: data.userId,
+  });
+
   // Update senior status
   const senior = activeSeniors.get(socket.id);
   if (senior) {
@@ -145,6 +160,43 @@ export const handleSeniorAvailable = (
   });
 
   logger.info("Senior is now available for matching", {
+    seniorId: data.userId,
+  });
+};
+
+/**
+ * Handle: senior_unavailable
+ *
+ * When senior marks themselves as unavailable (goes offline)
+ *
+ * Flow:
+ * 1. Remove senior from "available_seniors" room
+ * 2. Update senior status
+ *
+ * @param io - Socket.io server
+ * @param socket - Senior's socket
+ * @param data - Senior info
+ */
+export const handleSeniorUnavailable = (
+  io: Server,
+  socket: Socket,
+  data: { userId: string }
+) => {
+  logger.info("Senior marked as unavailable", {
+    socketId: socket.id,
+    userId: data.userId,
+  });
+
+  // Leave available seniors room
+  socket.leave("available_seniors");
+
+  // Update senior status (set to available but not in the room)
+  const senior = activeSeniors.get(socket.id);
+  if (senior) {
+    senior.status = "available";
+  }
+
+  logger.info("Senior is now unavailable", {
     seniorId: data.userId,
   });
 };
@@ -665,7 +717,7 @@ async function createSession(data: {
  * @param socket - Socket connection
  * @param data - Message data
  */
-export const handleChatMessage = (
+export const handleChatMessage = async (
   io: Server,
   socket: Socket,
   data: { sessionId: string; message: string }
@@ -682,13 +734,35 @@ export const handleChatMessage = (
 
   const senderId = student?.userId || senior?.userId || "unknown";
   const senderName = student?.name || senior?.name || "Unknown";
+  const senderRole = student ? "student" : "senior";
+
+  const timestamp = Date.now();
+
+  // 🔒 SAFETY: Store message in Firestore for moderation/safety review
+  try {
+    await db.collection("messages").add({
+      sessionId: data.sessionId,
+      senderId,
+      senderName,
+      senderRole,
+      message: data.message,
+      timestamp: new Date(timestamp),
+      createdAt: new Date(),
+    });
+
+    logger.info("💾 Chat message stored in Firestore", {
+      sessionId: data.sessionId,
+    });
+  } catch (err) {
+    logger.error("Failed to store message in Firestore", { error: err });
+  }
 
   // Broadcast message to everyone in the session room
   io.to(`session_${data.sessionId}`).emit("chat_message", {
     senderId,
     senderName,
     message: data.message,
-    timestamp: Date.now(),
+    timestamp,
   });
 
   logger.info("Chat message broadcasted", {

@@ -32,6 +32,15 @@ export default function SeniorDashboard() {
   const userId = "demo-senior-456";
   const userName = "Demo Senior";
 
+  // Save user data to localStorage for session page
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("userId", userId);
+      localStorage.setItem("userName", userName);
+      localStorage.setItem("userRole", "senior");
+    }
+  }, []);
+
   const { isConnected, socket } = useSocket(userId, userName, "senior");
 
   const [availability, setAvailability] =
@@ -63,6 +72,12 @@ export default function SeniorDashboard() {
 
     // Listen for successful session match
     socket.onSessionMatched((data) => {
+      // Store session data for voice call
+      if (typeof window !== "undefined" && data.roomUrl && data.token) {
+        localStorage.setItem("sessionRoomUrl", data.roomUrl);
+        localStorage.setItem("sessionToken", data.token);
+      }
+
       toast({
         title: "✅ Match Confirmed!",
         description: `Connected with ${data.partnerName}`,
@@ -94,7 +109,7 @@ export default function SeniorDashboard() {
     setAvailability(newStatus);
 
     // Emit availability status to backend
-    socket.seniorSetAvailable(newStatus === "online");
+    socket.seniorSetAvailable(newStatus === "online", userId, userName);
 
     toast({
       title: newStatus === "online" ? "🟢 You're Online" : "⚪ You're Offline",
