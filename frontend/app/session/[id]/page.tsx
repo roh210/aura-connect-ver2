@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +13,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
+import * as socketService from "@/services/socket.service";
+import ConnectionStatus from "@/components/ConnectionStatus";
 
 interface Message {
   id: string;
@@ -21,6 +25,25 @@ interface Message {
 }
 
 export default function SessionPage({ params }: { params: { id: string } }) {
+  // Get user info from localStorage (set during login)
+  const userId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("userId") || "demo-user"
+      : "demo-user";
+  const userName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("userName") || "Demo User"
+      : "Demo User";
+  const userRole =
+    typeof window !== "undefined"
+      ? ((localStorage.getItem("userRole") || "student") as
+          | "student"
+          | "senior")
+      : "student";
+
+  const { isConnected, socket } = useSocket(userId, userName, userRole);
+  const router = useRouter();
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -56,6 +79,38 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // WebSocket: Listen for incoming chat messages (only once on mount)
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    // Join the session room first
+    socket.joinSessionRoom(params.id);
+
+    // Set up listener for incoming messages
+    const handleIncomingMessage = (data: any) => {
+      // Determine sender role based on senderId
+      const isMyMessage = data.senderId === userId;
+      const messageSender = isMyMessage
+        ? userRole
+        : userRole === "student"
+        ? "senior"
+        : "student";
+
+      const newMessage: Message = {
+        id: `${data.timestamp}-${data.senderId}`,
+        sender: messageSender,
+        text: data.message,
+        timestamp: new Date(data.timestamp),
+      };
+      setMessages((prev) => [...prev, newMessage]);
+    };
+
+    socket.onChatMessage(handleIncomingMessage);
+
+    // Cleanup not needed since socket persists across navigation
+    // But in production, you'd want to remove the listener on unmount
+  }, [params.id, socket, isConnected, userId, userRole]); // Only run once when session ID changes
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -66,26 +121,9 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     e.preventDefault();
     if (!inputMessage.trim()) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: "student", // In real app, determine from user role
-      text: inputMessage,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    // Send message via WebSocket - backend will broadcast to everyone including us
+    socket.sendMessage(params.id, inputMessage);
     setInputMessage("");
-
-    // Simulate senior response (demo)
-    setTimeout(() => {
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "senior",
-        text: "I hear you. That sounds challenging. Tell me more about how you're feeling.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, response]);
-    }, 2000);
   };
 
   const handleToggleVoice = () => {
@@ -99,11 +137,18 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   };
 
   const handleEndSession = () => {
+    // Emit end_session event to backend
+    socket.endSession?.(params.id);
+
     toast({
       title: "✅ Session ended",
       description: "Thank you for using Aura Connect",
     });
-    // TODO: Navigate back to dashboard
+
+    // Navigate back to dashboard
+    setTimeout(() => {
+      router.push(userRole === "student" ? "/student" : "/senior");
+    }, 1500);
   };
 
   const handleFlagContent = () => {
@@ -119,6 +164,7 @@ export default function SessionPage({ params }: { params: { id: string } }) {
 
   return (
     <main className="min-h-screen bg-gray-900">
+      <ConnectionStatus isConnected={isConnected} />
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 p-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -163,35 +209,44 @@ export default function SessionPage({ params }: { params: { id: string } }) {
         <div className="flex-1 flex flex-col">
           <Card className="flex-1 flex flex-col bg-gray-800 border-gray-700">
             {/* Messages */}
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.sender === "student"
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth">
+              {messages.map((message) => {
+                const isMyMessage = message.sender === userRole;
+                const isSystemMessage = message.sender === "system";
+
+                return (
                   <div
-                    className={`max-w-[70%] rounded-lg p-3 ${
-                      message.sender === "system"
-                        ? "bg-blue-900/50 text-blue-200 text-center mx-auto text-sm"
-                        : message.sender === "student"
-                        ? "bg-purple-600 text-white"
-                        : "bg-gray-700 text-white"
+                    key={message.id}
+                    className={`flex ${
+                      isSystemMessage
+                        ? "justify-center"
+                        : isMyMessage
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
-                    <p className="text-sm">{message.text}</p>
-                    <p className="text-xs opacity-60 mt-1">
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    <div
+                      className={`max-w-[70%] rounded-lg p-3 break-words ${
+                        isSystemMessage
+                          ? "bg-blue-900/50 text-blue-200 text-center text-sm"
+                          : isMyMessage
+                          ? "bg-purple-600 text-white rounded-br-none"
+                          : "bg-gray-700 text-gray-100 rounded-bl-none"
+                      }`}
+                    >
+                      <p className="text-sm break-words whitespace-pre-wrap">
+                        {message.text}
+                      </p>
+                      <p className="text-xs opacity-60 mt-1">
+                        {message.timestamp.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </CardContent>
 

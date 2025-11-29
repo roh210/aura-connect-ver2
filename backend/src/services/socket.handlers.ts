@@ -420,14 +420,44 @@ export const handleEndSession = async (
     sessionId: data.sessionId,
   });
 
+  // Try to get session from memory first
   const session = activeSessions.get(data.sessionId);
 
+  // If not in memory, fetch from Firestore
   if (!session) {
-    logger.warn("Session not found for end request", {
-      sessionId: data.sessionId,
-    });
-    socket.emit("error", { message: "Session not found" });
-    return;
+    try {
+      const sessionDoc = await db
+        .collection("sessions")
+        .doc(data.sessionId)
+        .get();
+
+      if (!sessionDoc.exists) {
+        logger.warn("Session not found in database", {
+          sessionId: data.sessionId,
+        });
+        socket.emit("error", { message: "Session not found" });
+        return;
+      }
+
+      const sessionData = sessionDoc.data();
+
+      // Check if already ended
+      if (sessionData?.status === "ended") {
+        socket.emit("session_ended", {
+          sessionId: data.sessionId,
+          message: "Session already ended",
+          endedBy: "already_ended",
+        });
+        return;
+      }
+    } catch (error) {
+      logger.error("Error fetching session from Firestore", {
+        sessionId: data.sessionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      socket.emit("error", { message: "Failed to end session" });
+      return;
+    }
   }
 
   try {
@@ -441,18 +471,44 @@ export const handleEndSession = async (
         endReason: data.reason || "User ended session",
       });
 
-    // Determine who is ending (student or senior)
-    const isStudent = socket.id === session.studentSocketId;
-    const partnerSocketId = isStudent
-      ? session.seniorSocketId
-      : session.studentSocketId;
+    // Notify partner (if session is in memory)
+    if (session) {
+      const isStudent = socket.id === session.studentSocketId;
+      const partnerSocketId = isStudent
+        ? session.seniorSocketId
+        : session.studentSocketId;
 
-    // Notify partner
-    io.to(partnerSocketId).emit("session_ended", {
-      sessionId: data.sessionId,
-      message: `Your partner has ended the session.`,
-      endedBy: isStudent ? "student" : "senior",
-    });
+      // Notify partner
+      io.to(partnerSocketId).emit("session_ended", {
+        sessionId: data.sessionId,
+        message: `Your partner has ended the session.`,
+        endedBy: isStudent ? "student" : "senior",
+      });
+
+      // Free senior for new matches
+      const senior = activeSeniors.get(session.seniorSocketId);
+      if (senior) {
+        senior.status = "available";
+        senior.currentSessionId = undefined;
+
+        // Rejoin available seniors pool
+        const seniorSocket = io.sockets.sockets.get(session.seniorSocketId);
+        if (seniorSocket) {
+          seniorSocket.join("available_seniors");
+          seniorSocket.emit("status_changed", {
+            status: "available",
+            message: "You're now available for new matches",
+          });
+        }
+
+        logger.info("Senior freed from session", {
+          seniorId: senior.userId,
+        });
+      }
+
+      // Remove from active sessions
+      activeSessions.delete(data.sessionId);
+    }
 
     // Confirm to user who ended it
     socket.emit("session_ended", {
@@ -460,36 +516,6 @@ export const handleEndSession = async (
       message: "Session ended successfully",
       endedBy: "you",
     });
-
-    // Free senior for new matches
-    const senior = activeSeniors.get(session.seniorSocketId);
-    if (senior) {
-      senior.status = "available";
-      senior.currentSessionId = undefined;
-
-      // Rejoin available seniors pool
-      const seniorSocket = io.sockets.sockets.get(session.seniorSocketId);
-      if (seniorSocket) {
-        seniorSocket.join("available_seniors");
-        seniorSocket.emit("status_changed", {
-          status: "available",
-          message: "You're now available for new matches",
-        });
-      }
-
-      logger.info("Senior freed from session", {
-        seniorSocketId: session.seniorSocketId,
-      });
-    }
-
-    // Update student status
-    const student = activeStudents.get(session.studentSocketId);
-    if (student) {
-      student.status = "waiting";
-    }
-
-    // Remove from active sessions
-    activeSessions.delete(data.sessionId);
 
     logger.info("Session ended successfully", {
       sessionId: data.sessionId,
@@ -631,3 +657,64 @@ async function createSession(data: {
 
   return sessionData;
 }
+
+/**
+ * Handle chat message in session
+ *
+ * @param io - Socket.io server
+ * @param socket - Socket connection
+ * @param data - Message data
+ */
+export const handleChatMessage = (
+  io: Server,
+  socket: Socket,
+  data: { sessionId: string; message: string }
+) => {
+  logger.info("Chat message received", {
+    socketId: socket.id,
+    sessionId: data.sessionId,
+    messageLength: data.message.length,
+  });
+
+  // Get sender info
+  const student = activeStudents.get(socket.id);
+  const senior = activeSeniors.get(socket.id);
+
+  const senderId = student?.userId || senior?.userId || "unknown";
+  const senderName = student?.name || senior?.name || "Unknown";
+
+  // Broadcast message to everyone in the session room
+  io.to(`session_${data.sessionId}`).emit("chat_message", {
+    senderId,
+    senderName,
+    message: data.message,
+    timestamp: Date.now(),
+  });
+
+  logger.info("Chat message broadcasted", {
+    sessionId: data.sessionId,
+    senderId,
+  });
+};
+
+/**
+ * Handle user joining a session room
+ *
+ * @param io - Socket.io server
+ * @param socket - Socket connection
+ * @param data - Session data
+ */
+export const handleJoinSession = (
+  io: Server,
+  socket: Socket,
+  data: { sessionId: string }
+) => {
+  const roomName = `session_${data.sessionId}`;
+  socket.join(roomName);
+
+  logger.info("User joined session room", {
+    socketId: socket.id,
+    sessionId: data.sessionId,
+    roomName,
+  });
+};

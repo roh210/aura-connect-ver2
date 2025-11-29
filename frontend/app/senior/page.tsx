@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,73 +11,140 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useSocket } from "@/hooks/useSocket";
+import ConnectionStatus from "@/components/ConnectionStatus";
+import { useToast } from "@/hooks/use-toast";
 
 type AvailabilityStatus = "offline" | "online";
 
 interface IncomingRequest {
-  id: string;
+  studentId: string;
   studentName: string;
-  stressLevel: "low" | "medium" | "high";
-  waitTime: number;
-  previewText: string;
+  matchRequestId: string;
+  timestamp: number;
 }
 
 export default function SeniorDashboard() {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // TODO: Replace with real user data from auth context (Phase 7)
+  const userId = "demo-senior-456";
+  const userName = "Demo Senior";
+
+  const { isConnected, socket } = useSocket(userId, userName, "senior");
+
   const [availability, setAvailability] =
     useState<AvailabilityStatus>("offline");
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>(
     []
   );
-  const [queueSize, setQueueSize] = useState(3);
+  const [queueSize, setQueueSize] = useState(0);
   const [totalSessions, setTotalSessions] = useState(12);
 
+  // Listen for match requests from backend
+  useEffect(() => {
+    socket.onMatchRequest((data) => {
+      setIncomingRequests((prev) => [
+        ...prev,
+        {
+          studentId: data.studentId,
+          studentName: data.studentName,
+          matchRequestId: data.matchRequestId,
+          timestamp: data.timestamp,
+        },
+      ]);
+
+      toast({
+        title: "📢 New Match Request!",
+        description: `${data.studentName} is waiting to connect`,
+      });
+    });
+
+    // Listen for successful session match
+    socket.onSessionMatched((data) => {
+      toast({
+        title: "✅ Match Confirmed!",
+        description: `Connected with ${data.partnerName}`,
+      });
+
+      // Navigate to session
+      setTimeout(() => {
+        router.push(`/session/${data.sessionId}`);
+      }, 2000);
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.removeAllListeners();
+    };
+  }, [socket, router, toast]);
+
   const handleToggleAvailability = () => {
+    if (!isConnected) {
+      toast({
+        title: "⚠️ Not connected",
+        description: "Please wait for connection to establish",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newStatus = availability === "offline" ? "online" : "offline";
     setAvailability(newStatus);
 
-    // Simulate incoming request when going online (demo)
-    if (newStatus === "online") {
-      setTimeout(() => {
-        setIncomingRequests([
-          {
-            id: "req-1",
-            studentName: "Alex",
-            stressLevel: "medium",
-            waitTime: 4,
-            previewText: "Feeling anxious about upcoming exams...",
-          },
-        ]);
-      }, 2000);
-    } else {
+    // Emit availability status to backend
+    socket.seniorSetAvailable(newStatus === "online");
+
+    toast({
+      title: newStatus === "online" ? "🟢 You're Online" : "⚪ You're Offline",
+      description:
+        newStatus === "online"
+          ? "You'll receive match requests from students"
+          : "You won't receive any match requests",
+    });
+
+    // Clear pending requests when going offline
+    if (newStatus === "offline") {
       setIncomingRequests([]);
     }
   };
 
-  const handleAcceptRequest = (requestId: string) => {
-    setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
-    // TODO: Navigate to session page
-    console.log("Accepted request:", requestId);
+  const handleAcceptRequest = (studentId: string, matchRequestId: string) => {
+    // Emit accept to backend
+    socket.seniorAccept(studentId, matchRequestId);
+
+    // Remove from local state
+    setIncomingRequests((prev) =>
+      prev.filter((req) => req.matchRequestId !== matchRequestId)
+    );
+
+    toast({
+      title: "✅ Request accepted",
+      description: "Creating session...",
+    });
   };
 
-  const handleDeclineRequest = (requestId: string) => {
-    setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
-  };
+  const handleDeclineRequest = (studentId: string, matchRequestId: string) => {
+    // Emit decline to backend
+    socket.seniorDecline(studentId, matchRequestId);
 
-  const getStressLevelColor = (level: string) => {
-    switch (level) {
-      case "low":
-        return "bg-green-100 text-green-700";
-      case "medium":
-        return "bg-yellow-100 text-yellow-700";
-      case "high":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
+    // Remove from local state
+    setIncomingRequests((prev) =>
+      prev.filter((req) => req.matchRequestId !== matchRequestId)
+    );
+
+    toast({
+      title: "Request declined",
+      description: "Student will be matched with another senior",
+    });
   };
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-purple-50">
+      {/* Connection Status Indicator */}
+      <ConnectionStatus isConnected={isConnected} />
+
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -173,7 +241,10 @@ export default function SeniorDashboard() {
               </Card>
             ) : (
               incomingRequests.map((request) => (
-                <Card key={request.id} className="border-2 border-purple-200">
+                <Card
+                  key={request.matchRequestId}
+                  className="border-2 border-purple-200"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
@@ -181,37 +252,46 @@ export default function SeniorDashboard() {
                           Student: {request.studentName}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Waiting for {request.waitTime} minutes
+                          Request received{" "}
+                          {new Date(request.timestamp).toLocaleTimeString()}
                         </CardDescription>
                       </div>
-                      <Badge
-                        className={getStressLevelColor(request.stressLevel)}
-                      >
-                        {request.stressLevel.toUpperCase()}
+                      <Badge className="bg-purple-100 text-purple-700">
+                        WAITING
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="p-3 bg-gray-50 rounded-md">
                       <p className="text-sm text-gray-700">
-                        "{request.previewText}"
+                        A student is waiting to connect with you for support and
+                        conversation.
                       </p>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <Button
-                        onClick={() => handleAcceptRequest(request.id)}
-                        className="flex-1"
-                        size="lg"
+                        onClick={() =>
+                          handleAcceptRequest(
+                            request.studentId,
+                            request.matchRequestId
+                          )
+                        }
+                        className="flex-1 bg-green-600 hover:bg-green-700"
                       >
-                        ✅ Accept & Connect
+                        ✓ Accept
                       </Button>
                       <Button
-                        onClick={() => handleDeclineRequest(request.id)}
+                        onClick={() =>
+                          handleDeclineRequest(
+                            request.studentId,
+                            request.matchRequestId
+                          )
+                        }
                         variant="outline"
-                        size="lg"
+                        className="flex-1"
                       >
-                        ❌ Decline
+                        ✕ Decline
                       </Button>
                     </div>
                   </CardContent>

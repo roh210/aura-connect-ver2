@@ -28,6 +28,8 @@ import {
   handleDisconnect,
   handleSafetyAlert,
   handleEndSession,
+  handleChatMessage,
+  handleJoinSession,
 } from "./socket.handlers";
 
 /**
@@ -183,9 +185,11 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
     /**
      * Session Events
      */
+    socket.on("join_session", (data) => handleJoinSession(io, socket, data));
     socket.on("session_start", (data) => handleSessionStart(io, socket, data));
     socket.on("end_session", (data) => handleEndSession(io, socket, data));
     socket.on("safety_alert", (data) => handleSafetyAlert(io, socket, data));
+    socket.on("chat_message", (data) => handleChatMessage(io, socket, data));
 
     /**
      * Disconnection Handler

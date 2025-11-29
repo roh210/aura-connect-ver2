@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,37 +12,94 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useSocket } from "@/hooks/useSocket";
+import ConnectionStatus from "@/components/ConnectionStatus";
+import { useToast } from "@/hooks/use-toast";
 
 type ConnectionState = "idle" | "searching" | "queued" | "matched";
 
 export default function StudentDashboard() {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // TODO: Replace with real user data from auth context (Phase 7)
+  const userId = "demo-student-123";
+  const userName = "Demo Student";
+
+  const { isConnected, socket } = useSocket(userId, userName, "student");
+
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
   const [queuePosition, setQueuePosition] = useState(0);
-  const [activeSeniors, setActiveSeniors] = useState(5);
+  const [activeSeniors, setActiveSeniors] = useState(0);
+  const [estimatedWaitTime, setEstimatedWaitTime] = useState(0);
+
+  // Listen for queue updates from backend
+  useEffect(() => {
+    socket.onQueueUpdate((data) => {
+      setQueuePosition(data.position);
+      setActiveSeniors(data.activeSeniors);
+      setEstimatedWaitTime(data.estimatedWaitTime);
+      setConnectionState("queued");
+    });
+
+    // Listen for match notification
+    socket.onSessionMatched((data) => {
+      setConnectionState("matched");
+
+      toast({
+        title: "✅ Match Found!",
+        description: `Connected with ${data.partnerName}`,
+      });
+
+      // Navigate to session after 2 seconds
+      setTimeout(() => {
+        router.push(`/session/${data.sessionId}`);
+      }, 2000);
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      socket.removeAllListeners();
+    };
+  }, [socket, router, toast]);
 
   const handleFindSenior = () => {
+    if (!isConnected) {
+      toast({
+        title: "⚠️ Not connected",
+        description: "Please wait for connection to establish",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setConnectionState("searching");
 
-    // Simulate searching -> queued
-    setTimeout(() => {
-      setConnectionState("queued");
-      setQueuePosition(3);
-    }, 1500);
+    // Emit join queue event to backend with user data
+    socket.studentJoinQueue(userId, userName);
 
-    // Simulate match after queue time (demo)
-    setTimeout(() => {
-      setConnectionState("matched");
-    }, 5000);
+    toast({
+      title: "🔍 Finding a senior...",
+      description: "You'll be matched with the next available senior",
+    });
   };
-
   const handleCancelSearch = () => {
+    socket.studentLeaveQueue();
     setConnectionState("idle");
     setQueuePosition(0);
+
+    toast({
+      title: "Search cancelled",
+      description: "You've left the queue",
+    });
   };
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50">
+      {/* Connection Status Indicator */}
+      <ConnectionStatus isConnected={isConnected} />
+
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
