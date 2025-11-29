@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,30 +22,51 @@ type ConnectionState = "idle" | "searching" | "queued" | "matched";
 export default function StudentDashboard() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user, signOut, loading } = useAuth();
 
-  // TODO: Replace with real user data from auth context (Phase 7)
-  const userId = "demo-student-123";
-  const userName = "Demo Student";
-
-  // Save user data to localStorage for session page
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("userId", userId);
-      localStorage.setItem("userName", userName);
-      localStorage.setItem("userRole", "student");
-    }
-  }, []);
-
-  const { isConnected, socket } = useSocket(userId, userName, "student");
-
+  // All hooks MUST be called before any conditional returns
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
   const [queuePosition, setQueuePosition] = useState(0);
   const [activeSeniors, setActiveSeniors] = useState(0);
   const [estimatedWaitTime, setEstimatedWaitTime] = useState(0);
 
+  // Use fallback values while user is loading
+  const userId = user?.uid || "";
+  const userName = user?.displayName || "";
+
+  const { isConnected, socket } = useSocket(userId, userName, "student");
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/login");
+    }
+  }, [user, loading, router]);
+
+  // Save user data to localStorage for session page
+  useEffect(() => {
+    if (user && typeof window !== "undefined") {
+      localStorage.setItem("userId", userId);
+      localStorage.setItem("userName", userName);
+      localStorage.setItem("userRole", "student");
+    }
+  }, [user, userId, userName]);
+
   // Listen for queue updates from backend
   useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log(
+        "⚠️ Cannot set up student listeners - socket:",
+        !!socket,
+        "isConnected:",
+        isConnected
+      );
+      return;
+    }
+
+    console.log("🔧 Setting up student socket listeners");
+
     socket.onQueueUpdate((data) => {
       setQueuePosition(data.position);
       setActiveSeniors(data.activeSeniors);
@@ -54,6 +76,7 @@ export default function StudentDashboard() {
 
     // Listen for match notification
     socket.onSessionMatched((data) => {
+      console.log("📥 Student received session matched event:", data);
       setConnectionState("matched");
 
       // Store session data for voice call
@@ -69,15 +92,14 @@ export default function StudentDashboard() {
 
       // Navigate to session after 2 seconds
       setTimeout(() => {
+        console.log("🔀 Student navigating to session:", data.sessionId);
         router.push(`/session/${data.sessionId}`);
       }, 2000);
     });
 
-    // Cleanup listeners on unmount
-    return () => {
-      socket.removeAllListeners();
-    };
-  }, [socket, router, toast]);
+    // Don't remove listeners on unmount - socket persists across pages
+    // Cleanup only happens on logout (handled in AuthContext)
+  }, [socket, isConnected, router, toast]);
 
   const handleFindSenior = () => {
     if (!isConnected) {
@@ -110,18 +132,43 @@ export default function StudentDashboard() {
     });
   };
 
+  // Show loading while checking auth (AFTER all hooks)
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50">
       {/* Connection Status Indicator */}
       <ConnectionStatus isConnected={isConnected} />
 
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold">👨‍🎓 Student Dashboard</h1>
-          <p className="text-gray-600">
-            Connect with experienced seniors for support and conversation
-          </p>
+        {/* Header with Welcome & Logout */}
+        <div className="flex justify-between items-center">
+          <div className="text-center flex-1 space-y-2">
+            <h1 className="text-4xl font-bold">👨‍🎓 Student Dashboard</h1>
+            <p className="text-gray-600">
+              Welcome back,{" "}
+              <span className="font-semibold text-purple-600">{userName}</span>!
+            </p>
+            <p className="text-sm text-gray-500">
+              Connect with experienced seniors for support and conversation
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await signOut();
+              router.push("/auth/login");
+            }}
+            className="ml-4"
+          >
+            Log Out
+          </Button>
         </div>
 
         {/* Main Action Card */}

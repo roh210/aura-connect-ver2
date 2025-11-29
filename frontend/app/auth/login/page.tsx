@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,18 +12,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-
-type UserRole = "student" | "senior";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("student");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { signIn, user } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Auto-redirect when user is loaded
+  useEffect(() => {
+    if (user) {
+      console.log("User logged in, redirecting to:", `/${user.role}`);
+      router.push(`/${user.role}`);
+    }
+  }, [user, router]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -35,28 +45,41 @@ export default function LoginPage() {
       return;
     }
 
-    if (!email.includes("@")) {
+    setLoading(true);
+
+    try {
+      // Firebase authentication
+      await signIn(email, password);
+
       toast({
-        title: "⚠️ Invalid email",
-        description: "Please enter a valid email address",
+        title: "✅ Login successful",
+        description: "Redirecting to dashboard...",
+      });
+
+      // Redirect will happen in useEffect based on user role
+    } catch (error: any) {
+      // Firebase error codes
+      const errorMessages: Record<string, string> = {
+        "auth/user-not-found": "No account found with this email",
+        "auth/wrong-password": "Incorrect password",
+        "auth/invalid-email": "Invalid email address",
+        "auth/user-disabled": "This account has been disabled",
+        "auth/too-many-requests":
+          "Too many login attempts. Please try again later.",
+        "auth/invalid-credential": "Invalid email or password",
+      };
+
+      const message =
+        errorMessages[error.code] || "Failed to sign in. Please try again.";
+
+      toast({
+        title: "❌ Sign in failed",
+        description: message,
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    // TODO: Implement Firebase authentication
-    // Extract name from email (before @)
-    const userName = email.split("@")[0];
-
-    toast({
-      title: "✅ Login successful",
-      description: `Welcome back, ${userName}!`,
-    });
-
-    // Route to role-specific dashboard
-    setTimeout(() => {
-      router.push(`/${role}`);
-    }, 1000);
   };
 
   return (
@@ -72,71 +95,34 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Role Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">I am a...</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole("student")}
-                  className={`p-3 border-2 rounded-md text-center transition-all ${
-                    role === "student"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="text-2xl mb-1">👨‍🎓</div>
-                  <div className="text-xs font-medium">Student</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("senior")}
-                  className={`p-3 border-2 rounded-md text-center transition-all ${
-                    role === "senior"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="text-2xl mb-1">👴</div>
-                  <div className="text-xs font-medium">Senior</div>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <input
+              <Label htmlFor="email">Email</Label>
+              <Input
                 id="email"
                 type="email"
-                placeholder={
-                  role === "student"
-                    ? "student@university.edu"
-                    : "senior@email.com"
-                }
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              Sign In
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 

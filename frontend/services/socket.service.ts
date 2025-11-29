@@ -40,6 +40,8 @@ export interface LiveStats {
 
 // Module-level socket instance (singleton pattern with functional style)
 let socket: Socket | null = null;
+let lastIdentity: { userId: string; userName: string; role: UserRole } | null =
+  null;
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
@@ -52,11 +54,37 @@ export const connectSocket = (
   userName: string,
   role: UserRole
 ): Socket => {
-  if (socket?.connected) {
-    console.log("Socket already connected");
+  // If socket exists and is connected with same identity, just return it
+  if (
+    socket?.connected &&
+    lastIdentity?.userId === userId &&
+    lastIdentity?.role === role
+  ) {
+    console.log("✅ Socket already connected with same identity, reusing...");
     return socket;
   }
 
+  // If socket exists and is connected but identity changed, re-identify
+  if (
+    socket?.connected &&
+    (lastIdentity?.userId !== userId || lastIdentity?.role !== role)
+  ) {
+    console.log("🔵 Socket connected but identity changed, re-identifying...");
+    const identifyData = { userId, name: userName, role };
+    console.log("🔵 Emitting identify event with data:", identifyData);
+    socket.emit("identify", identifyData);
+    lastIdentity = { userId, userName, role };
+    return socket;
+  }
+
+  // If socket exists but disconnected, disconnect completely first
+  if (socket) {
+    console.log("⚠️ Disconnecting stale socket before reconnecting");
+    socket.disconnect();
+    socket = null;
+  }
+
+  console.log("🔵 Creating new socket connection...");
   socket = io(SOCKET_URL, {
     transports: ["websocket", "polling"],
     reconnection: true,
@@ -70,6 +98,7 @@ export const connectSocket = (
     const identifyData = { userId, name: userName, role };
     console.log("🔵 Emitting identify event with data:", identifyData);
     socket?.emit("identify", identifyData);
+    lastIdentity = { userId, userName, role };
   });
 
   socket.on("identified", (data) => {
@@ -98,6 +127,7 @@ export const getSocket = (): Socket | null => socket;
 export const disconnectSocket = (): void => {
   socket?.disconnect();
   socket = null;
+  lastIdentity = null;
 };
 
 /**
@@ -125,6 +155,9 @@ export const studentLeaveQueue = (): void => {
 };
 
 export const onQueueUpdate = (callback: (data: QueueUpdate) => void): void => {
+  // Remove existing listener to prevent duplicates
+  socket?.off("queue_update");
+
   socket?.on("queue_update", (data) => {
     console.log("📥 Received: queue_update", data);
     callback(data);
@@ -153,8 +186,21 @@ export const seniorSetAvailable = (
 export const onMatchRequest = (
   callback: (data: MatchRequest) => void
 ): void => {
+  if (!socket) {
+    console.warn(
+      "⚠️ Socket not initialized, cannot set up match request listener"
+    );
+    return;
+  }
+
+  // Remove existing listeners to prevent duplicates
+  socket.off("student_waiting");
+  socket.off("queue_update");
+
+  console.log("🔧 Setting up student_waiting and queue_update listeners");
+
   // Listen for new students joining queue (real-time)
-  socket?.on("student_waiting", (data) => {
+  socket.on("student_waiting", (data) => {
     console.log("📥 Received: student_waiting", data);
     callback({
       studentId: data.studentId,
@@ -165,7 +211,7 @@ export const onMatchRequest = (
   });
 
   // Listen for initial queue update (when senior becomes available)
-  socket?.on("queue_update", (data) => {
+  socket.on("queue_update", (data) => {
     console.log("📥 Received: queue_update", data);
     // Process each waiting student
     if (data.waitingStudents && Array.isArray(data.waitingStudents)) {
@@ -204,6 +250,9 @@ export const seniorDecline = (
 export const onSessionMatched = (
   callback: (data: SessionMatched) => void
 ): void => {
+  // Remove existing listener to prevent duplicates
+  socket?.off("matched");
+
   socket?.on("matched", (data) => {
     console.log("📥 Received: matched", data);
     // Transform backend data to match our interface
@@ -234,6 +283,9 @@ export const endSession = (sessionId: string): void => {
 };
 
 export const onChatMessage = (callback: (data: ChatMessage) => void): void => {
+  // Remove existing listener to prevent duplicates
+  socket?.off("chat_message");
+
   socket?.on("chat_message", (data) => {
     console.log("📥 Received: chat_message", data);
     callback(data);

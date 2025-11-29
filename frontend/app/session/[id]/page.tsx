@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +14,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useSocket } from "@/hooks/useSocket";
 import * as socketService from "@/services/socket.service";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import VoiceCall from "@/components/VoiceCall";
@@ -26,24 +26,37 @@ interface Message {
 }
 
 export default function SessionPage({ params }: { params: { id: string } }) {
-  // Get user info from localStorage (set during login)
-  const userId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("userId") || "demo-user"
-      : "demo-user";
-  const userName =
-    typeof window !== "undefined"
-      ? localStorage.getItem("userName") || "Demo User"
-      : "Demo User";
-  const userRole =
-    typeof window !== "undefined"
-      ? ((localStorage.getItem("userRole") || "student") as
-          | "student"
-          | "senior")
-      : "student";
-
-  const { isConnected, socket } = useSocket(userId, userName, userRole);
+  const { user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  // Get user info from auth context or localStorage (fallback)
+  const userId =
+    user?.uid ||
+    (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
+  const userName =
+    user?.displayName ||
+    (typeof window !== "undefined" ? localStorage.getItem("userName") : null);
+  const userRole = (user?.role ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("userRole")
+      : null)) as "student" | "senior" | null;
+
+  // Redirect if no user data available
+  useEffect(() => {
+    if (!userId || !userName || !userRole) {
+      toast({
+        title: "⚠️ Session error",
+        description: "User data not found. Please log in again.",
+        variant: "destructive",
+      });
+      router.push("/auth/login");
+    }
+  }, [userId, userName, userRole, router, toast]);
+
+  // Reuse existing socket from dashboard (don't create a new one)
+  const socket = socketService;
+  const isConnected = socketService.isSocketConnected();
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -58,7 +71,6 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
   // Voice call data (roomUrl and token from matched event)
   const [callData, setCallData] = useState<{
@@ -109,8 +121,8 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     const handleIncomingMessage = (data: any) => {
       // Determine sender role based on senderId
       const isMyMessage = data.senderId === userId;
-      const messageSender = isMyMessage
-        ? userRole
+      const messageSender: "student" | "senior" | "system" = isMyMessage
+        ? userRole || "student"
         : userRole === "student"
         ? "senior"
         : "student";
@@ -305,7 +317,7 @@ export default function SessionPage({ params }: { params: { id: string } }) {
             <VoiceCall
               roomUrl={callData.roomUrl}
               token={callData.token}
-              userName={userName}
+              userName={userName || "User"}
               onCallEnd={handleCallEnd}
             />
           )}

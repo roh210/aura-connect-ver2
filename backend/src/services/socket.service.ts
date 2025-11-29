@@ -22,6 +22,7 @@ import { logger } from "../config/logger";
 import { env } from "../config/env";
 import {
   handleStudentJoinQueue,
+  handleStudentLeaveQueue,
   handleSeniorAccept,
   handleSeniorAvailable,
   handleSeniorUnavailable,
@@ -176,6 +177,7 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
     socket.on("student_join_queue", (data) =>
       handleStudentJoinQueue(io, socket, data)
     );
+    socket.on("student_leave_queue", () => handleStudentLeaveQueue(io, socket));
 
     /**
      * Senior Events
@@ -224,6 +226,10 @@ export const initializeSocket = (httpServer: HttpServer): Server => {
   });
 
   logger.info("Socket.io server initialized successfully");
+
+  // Clear any stale sessions on startup
+  activeSessions.clear();
+  logger.info("Cleared stale sessions from previous server instance");
 
   return io;
 };

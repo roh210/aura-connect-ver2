@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 type UserRole = "student" | "senior" | null;
@@ -21,10 +24,12 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<UserRole>(null);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { signUp } = useAuth();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -46,10 +51,10 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 8) {
+    if (password.length < 6) {
       toast({
         title: "⚠️ Weak password",
-        description: "Password must be at least 8 characters",
+        description: "Password must be at least 6 characters",
         variant: "destructive",
       });
       return;
@@ -64,16 +69,43 @@ export default function SignupPage() {
       return;
     }
 
-    // TODO: Implement Firebase authentication
-    toast({
-      title: "✅ Account created!",
-      description: `Welcome to Aura Connect, ${name}!`,
-    });
+    setLoading(true);
 
-    // Route to role-specific dashboard
-    setTimeout(() => {
-      router.push(`/${role}`);
-    }, 1000);
+    try {
+      // Firebase authentication
+      await signUp(email, password, name, role);
+
+      toast({
+        title: "✅ Account created!",
+        description: `Welcome to Aura Connect, ${name}!`,
+      });
+
+      // Redirect will happen after auth state updates
+      setTimeout(() => {
+        router.push(`/${role}`);
+      }, 1000);
+    } catch (error: any) {
+      // Firebase error codes
+      const errorMessages: Record<string, string> = {
+        "auth/email-already-in-use":
+          "An account with this email already exists",
+        "auth/invalid-email": "Invalid email address",
+        "auth/weak-password": "Password should be at least 6 characters",
+        "auth/operation-not-allowed": "Email/password sign up is not enabled",
+      };
+
+      const message =
+        errorMessages[error.code] ||
+        "Failed to create account. Please try again.";
+
+      toast({
+        title: "❌ Sign up failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -122,25 +154,22 @@ export default function SignupPage() {
 
             {/* Name */}
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Full Name
-              </label>
-              <input
+              <Label htmlFor="name">Full Name</Label>
+              <Input
                 id="name"
                 type="text"
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
             {/* Email */}
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <input
+              <Label htmlFor="email">Email</Label>
+              <Input
                 id="email"
                 type="email"
                 placeholder={
@@ -152,42 +181,41 @@ export default function SignupPage() {
                 }
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
             {/* Password */}
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 type="password"
-                placeholder="Min. 8 characters"
+                placeholder="Min. 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
             {/* Confirm Password */}
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">
-                Confirm Password
-              </label>
-              <input
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
                 id="confirmPassword"
                 type="password"
                 placeholder="Re-enter password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={loading}
+                required
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating account..." : "Create Account"}
             </Button>
           </form>
 

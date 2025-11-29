@@ -134,6 +134,10 @@ export default function VoiceCall({
 
       console.log("✅ Successfully joined Daily.co call");
 
+      // Enable microphone by default when joining
+      daily.setLocalAudio(true);
+      setIsMuted(false);
+
       toast({
         title: "📞 Joined call",
         description: "Voice connection established",

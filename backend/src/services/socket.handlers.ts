@@ -111,6 +111,56 @@ export const handleStudentJoinQueue = (
 };
 
 /**
+ * Handle: student_leave_queue
+ *
+ * When student clicks "Cancel" or navigates away before matching
+ *
+ * Flow:
+ * 1. Remove student from waiting queue
+ * 2. Update student status
+ * 3. Notify seniors that student is no longer available
+ * 4. Confirm to student
+ *
+ * @param io - Socket.io server
+ * @param socket - Student's socket
+ */
+export const handleStudentLeaveQueue = (io: Server, socket: Socket) => {
+  logger.info("Student leaving queue", {
+    socketId: socket.id,
+  });
+
+  const student = activeStudents.get(socket.id);
+
+  if (!student) {
+    logger.warn("Student not found in active connections", {
+      socketId: socket.id,
+    });
+    return;
+  }
+
+  // Remove from queue
+  removeStudentFromQueue(socket.id);
+
+  // Update student status
+  student.status = "waiting"; // Not in queue, just online
+
+  // Notify seniors this student left
+  io.to("available_seniors").emit("student_taken", {
+    studentId: student.userId,
+  });
+
+  // Confirm to student
+  socket.emit("queue_left", {
+    success: true,
+    message: "You've left the queue",
+  });
+
+  logger.info("Student removed from queue", {
+    studentId: student.userId,
+  });
+};
+
+/**
  * Handle: senior_available
  *
  * When senior marks themselves as available
@@ -233,6 +283,19 @@ export const handleSeniorAccept = async (
     studentId: data.studentId,
   });
 
+  // Check if senior is already in a session
+  const seniorConnection = activeSeniors.get(socket.id);
+  if (seniorConnection?.status === "in-call") {
+    logger.warn("Senior already in a session", {
+      seniorId: data.seniorId,
+      currentSessionId: seniorConnection.currentSessionId,
+    });
+    socket.emit("match_failed", {
+      error: "You are already in a session",
+    });
+    return;
+  }
+
   // Find student in queue
   const student = findStudentInQueue(data.studentId);
 
@@ -251,7 +314,6 @@ export const handleSeniorAccept = async (
 
   // Update statuses
   const studentConnection = activeStudents.get(student.socketId);
-  const seniorConnection = activeSeniors.get(socket.id);
 
   if (studentConnection) {
     studentConnection.status = "matched";
