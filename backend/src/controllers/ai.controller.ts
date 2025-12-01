@@ -66,9 +66,11 @@ export const generateSuggestionsEndpoint = async (
 
     const suggestions = await generateSuggestions(recentMessages);
 
-    logger.info("Suggestions generated", {
+    logger.info("Multi-level suggestions generated", {
       messageCount: recentMessages.length,
-      suggestionCount: suggestions.length,
+      quickRepliesCount: suggestions.quickReplies.length,
+      guidedPromptsCount: suggestions.guidedPrompts.length,
+      aiDraftLength: suggestions.aiDraft.length,
     });
 
     res.json({ suggestions });

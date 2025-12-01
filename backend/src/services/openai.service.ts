@@ -74,6 +74,12 @@ export interface SentimentAnalysisResult {
   indicators: string[]; // Key phrases that influenced the score
 }
 
+export interface MultiLevelResponses {
+  quickReplies: string[]; // 3 short replies (< 50 chars each)
+  guidedPrompts: string[]; // 3 sentence starters (< 30 chars each)
+  aiDraft: string; // 1 full response (2-3 sentences, < 200 chars)
+}
+
 export interface InterventionDecision {
   shouldIntervene: boolean;
   reason: string;
@@ -218,75 +224,83 @@ function fallbackIcebreaker(
 }
 
 /**
- * 1.5. Generate Conversation Suggestions (GPT-4o)
+ * 1.5. Generate Multi-Level Response Suggestions (GPT-4o)
  *
- * ALGORITHM: AI Co-Pilot for seniors - suggests 3 empathetic responses
+ * ALGORITHM: AI Co-Pilot for seniors - 3 levels of assistance
  *
  * Input: Recent chat messages (last 5)
- * Output: 3 clickable response suggestions
+ * Output: Quick replies, guided prompts, and AI draft
  * Model: GPT-4o (requires empathy and context awareness)
  * Cost: ~$0.01 per call
  * Latency: ~2-3 seconds
  *
- * Real-world example: Gmail Smart Reply, LinkedIn comment suggestions
+ * Real-world example: Gmail Smart Reply + Smart Compose
  */
 export async function generateSuggestions(
   recentMessages: Array<{ sender: "student" | "senior"; text: string }>
-): Promise<string[]> {
+): Promise<MultiLevelResponses> {
   try {
-    // Build conversation context
-    const conversationContext = recentMessages
+    // Get last 5 messages for context
+    const lastMessages = recentMessages.slice(-5);
+    const conversationContext = lastMessages
       .map(
         (msg) =>
           `${msg.sender === "student" ? "Student" : "Senior"}: ${msg.text}`
       )
       .join("\n");
 
-    const prompt = `You are an empathetic counseling assistant helping a senior mentor respond to a stressed college student.
+    // Get just the student's last message
+    const studentMessages = lastMessages.filter(
+      (msg) => msg.sender === "student"
+    );
+    const lastStudentMessage =
+      studentMessages[studentMessages.length - 1]?.text || "";
 
-RECENT CONVERSATION:
+    const prompt = `You are helping a peer counselor (senior) respond to a college student.
+
+CONVERSATION CONTEXT:
 ${conversationContext}
 
-TASK:
-Generate 3 SHORT, empathetic response suggestions for the senior to click and send. Each should:
-1. Validate the student's feelings
-2. Ask a thoughtful follow-up question OR offer gentle support
-3. Be 1-2 sentences maximum
-4. Feel natural and conversational (not scripted/robotic)
-5. Avoid medical/therapy language (we're peers, not therapists)
+STUDENT'S LAST MESSAGE: "${lastStudentMessage}"
 
-TONE: Warm, non-judgmental, supportive, like a caring older friend
+Generate 3 TYPES of responses:
 
-FORMAT: Return ONLY valid JSON, no markdown, no code blocks:
+1. QUICK REPLIES (3 short, ready-to-send responses):
+   - Each under 50 characters
+   - Can send immediately without editing
+   - Warm, empathetic, natural
+   - Examples: "I hear you", "That sounds really tough", "Tell me more about that"
+
+2. GUIDED PROMPTS (3 sentence starters the senior will complete):
+   - Each under 30 characters
+   - Leaves room for senior to personalize
+   - Examples: "Can you tell me more about...", "It sounds like you're feeling...", "What would help you..."
+
+3. AI DRAFT (1 full response the senior can edit):
+   - 2-3 complete sentences
+   - Under 200 characters total
+   - Empathetic, validating, supportive
+   - College-appropriate language
+
+Return ONLY valid JSON with this exact structure (no markdown, no code blocks):
 {
-  "suggestions": [
-    "First suggestion here",
-    "Second suggestion here", 
-    "Third suggestion here"
-  ]
+  "quickReplies": ["reply1", "reply2", "reply3"],
+  "guidedPrompts": ["prompt1", "prompt2", "prompt3"],
+  "aiDraft": "Full response here that senior can edit before sending."
 }
 
-EXAMPLES:
-{
-  "suggestions": [
-    "That sounds really tough. What's been the hardest part for you?",
-    "I hear you. It's okay to feel overwhelmed sometimes.",
-    "Have you been able to take any breaks for yourself lately?"
-  ]
-}
+Be warm, genuine, age-appropriate. Avoid clinical language.`;
 
-Now generate 3 unique suggestions:`;
-
-    logger.debug("Generating conversation suggestions", {
+    logger.debug("Generating multi-level suggestions", {
       messageCount: recentMessages.length,
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
     });
 
     const response = await openai.chat.completions.create({
-      model: "openai/gpt-4o",
+      model: "openai/gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.7, // Moderate creativity (natural but consistent)
-      max_tokens: 150, // ~3 short suggestions
+      temperature: 0.7,
+      max_tokens: 500,
     });
 
     let content = response.choices[0].message.content?.trim() || "{}";
@@ -294,14 +308,35 @@ Now generate 3 unique suggestions:`;
     // Remove markdown code blocks if present
     content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
 
-    const result = JSON.parse(content) as { suggestions: string[] };
+    const result = JSON.parse(content) as MultiLevelResponses;
 
-    logger.info("Suggestions generated successfully", {
-      count: result.suggestions.length,
+    // Validate structure
+    if (
+      !result.quickReplies ||
+      !Array.isArray(result.quickReplies) ||
+      result.quickReplies.length !== 3
+    ) {
+      throw new Error("Invalid quickReplies format");
+    }
+    if (
+      !result.guidedPrompts ||
+      !Array.isArray(result.guidedPrompts) ||
+      result.guidedPrompts.length !== 3
+    ) {
+      throw new Error("Invalid guidedPrompts format");
+    }
+    if (!result.aiDraft || typeof result.aiDraft !== "string") {
+      throw new Error("Invalid aiDraft format");
+    }
+
+    logger.info("Multi-level suggestions generated successfully", {
+      quickRepliesCount: result.quickReplies.length,
+      guidedPromptsCount: result.guidedPrompts.length,
+      aiDraftLength: result.aiDraft.length,
       tokensUsed: response.usage?.total_tokens,
     });
 
-    return result.suggestions;
+    return result;
   } catch (error) {
     logger.error("Failed to generate suggestions", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -313,30 +348,48 @@ Now generate 3 unique suggestions:`;
 }
 
 /**
- * Fallback Suggestions (No AI Required)
+ * Fallback Multi-Level Suggestions (No AI Required)
  *
  * GRACEFUL DEGRADATION: If AI fails, still provide helpful suggestions
  */
 function fallbackSuggestions(
   recentMessages: Array<{ sender: "student" | "senior"; text: string }>
-): string[] {
+): MultiLevelResponses {
   // If student just messaged, provide responsive suggestions
   const lastMessage = recentMessages[recentMessages.length - 1];
 
   if (lastMessage?.sender === "student") {
-    return [
-      "I hear you. Tell me more about that.",
-      "That sounds really challenging. How are you coping?",
-      "Thanks for sharing. What would be most helpful right now?",
-    ];
+    return {
+      quickReplies: [
+        "I hear you",
+        "That sounds tough",
+        "Tell me more about that",
+      ],
+      guidedPrompts: [
+        "Can you tell me more about...",
+        "It sounds like you're feeling...",
+        "What would help you...",
+      ],
+      aiDraft:
+        "I hear you, and that sounds really challenging. Thanks for sharing this with me. What would be most helpful for you right now?",
+    };
   }
 
   // Generic conversation starters
-  return [
-    "How has your week been going?",
-    "What's been on your mind lately?",
-    "Is there anything specific you'd like to talk about?",
-  ];
+  return {
+    quickReplies: [
+      "How are you doing?",
+      "What's on your mind?",
+      "I'm here to listen",
+    ],
+    guidedPrompts: [
+      "How has your week...",
+      "What's been on your mind...",
+      "Is there anything you'd like...",
+    ],
+    aiDraft:
+      "How has your week been going? I'm here to listen and support you. Feel free to share whatever is on your mind.",
+  };
 }
 
 /**

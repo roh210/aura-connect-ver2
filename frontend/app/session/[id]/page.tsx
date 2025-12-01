@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as socketService from "@/services/socket.service";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import VoiceCall from "@/components/VoiceCall";
-import AISuggestionsPanel from "@/components/AISuggestionsPanel";
+import ResponseLevelSelector from "@/components/ResponseLevelSelector";
 import CrisisAlert from "@/components/CrisisAlert";
 import SentimentMeter from "@/components/SentimentMeter";
 import { Lightbulb } from "lucide-react";
@@ -82,6 +82,16 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const [icebreaker, setIcebreaker] = useState<string>("");
   const [icebreakerLoading, setIcebreakerLoading] = useState(true);
 
+  // Multi-Level Responses state (Phase 8B.5)
+  const [aiResponses, setAiResponses] = useState<{
+    quickReplies: string[];
+    guidedPrompts: string[];
+    aiDraft: string;
+  }>({ quickReplies: [], guidedPrompts: [], aiDraft: "" });
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const lastProcessedLength = useRef(0);
+  const isFetchingResponses = useRef(false);
+
   // Crisis Detection state (Phase 8A.5)
   const [crisisData, setCrisisData] = useState<{
     severity: "critical" | "high" | "medium" | "low" | null;
@@ -89,6 +99,71 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     recommendedAction: string;
   }>({ severity: null, flags: [], recommendedAction: "" });
   const lastCheckedMessageCount = useRef(0);
+
+  // Fetch multi-level responses when student messages (Phase 8B.5)
+  useEffect(() => {
+    const fetchResponses = async () => {
+      // Only for seniors
+      if (userRole !== "senior") return;
+
+      // Need at least 2 messages
+      if (messages.length < 2) return;
+
+      // Check if already processed
+      if (messages.length === lastProcessedLength.current) return;
+
+      // Only fetch if last message was from student
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender !== "student") {
+        lastProcessedLength.current = messages.length;
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingResponses.current) return;
+
+      try {
+        isFetchingResponses.current = true;
+        lastProcessedLength.current = messages.length;
+        setResponsesLoading(true);
+
+        // Get last 5 messages for context
+        const recentMessages = messages
+          .filter((msg) => msg.sender !== "system")
+          .slice(-5)
+          .map((msg) => ({
+            sender: msg.sender,
+            text: msg.text,
+          }));
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/ai/suggestions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recentMessages }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error("Failed to fetch responses:", response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+        setAiResponses(data.suggestions);
+      } catch (error) {
+        console.error("Failed to fetch AI responses:", error);
+      } finally {
+        setResponsesLoading(false);
+        isFetchingResponses.current = false;
+      }
+    };
+
+    // Debounce to batch rapid re-renders
+    const timeoutId = setTimeout(fetchResponses, 300);
+    return () => clearTimeout(timeoutId);
+  }, [messages, userRole]);
 
   // Voice call data (roomUrl and token from matched event)
   const [callData, setCallData] = useState<{
@@ -264,11 +339,20 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     setInputMessage("");
   };
 
-  // Handle clicking on AI suggestion
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputMessage(suggestion);
-    // Optionally auto-send:
-    // socket.sendMessage(params.id, suggestion);
+  // Handle multi-level response selections (Phase 8B.5)
+  const handleQuickReply = (reply: string) => {
+    // Quick replies send immediately
+    socket.sendMessage(params.id, reply);
+  };
+
+  const handleGuidedPrompt = (prompt: string) => {
+    // Guided prompts fill input for completion
+    setInputMessage(prompt);
+  };
+
+  const handleDraftSelect = (draft: string) => {
+    // AI draft fills input for editing
+    setInputMessage(draft);
   };
 
   const handleToggleVoice = () => {
@@ -392,21 +476,21 @@ export default function SessionPage({ params }: { params: { id: string } }) {
             </Card>
           )}
 
-          {/* AI Suggestions Panel (Phase 8A.3) - Only for seniors */}
-          {userRole === "senior" && (
-            <div className="mb-4">
-              <AISuggestionsPanel
-                messages={messages
-                  .filter((msg) => msg.sender !== "system")
-                  .map((msg) => ({
-                    sender: msg.sender as "student" | "senior",
-                    text: msg.text,
-                  }))}
-                onSuggestionClick={handleSuggestionClick}
-                userRole={userRole}
-              />
-            </div>
-          )}
+          {/* Multi-Level Response Selector (Phase 8B.5) - Only for seniors */}
+          {userRole === "senior" &&
+            !responsesLoading &&
+            aiResponses.quickReplies.length > 0 && (
+              <div className="mb-4">
+                <ResponseLevelSelector
+                  quickReplies={aiResponses.quickReplies}
+                  guidedPrompts={aiResponses.guidedPrompts}
+                  aiDraft={aiResponses.aiDraft}
+                  onQuickReplySelect={handleQuickReply}
+                  onGuidedPromptSelect={handleGuidedPrompt}
+                  onDraftSelect={handleDraftSelect}
+                />
+              </div>
+            )}
 
           {/* Sentiment Meter (Phase 8A.7) - Only for seniors */}
           {userRole === "senior" && (
