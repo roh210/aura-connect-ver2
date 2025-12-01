@@ -1,97 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import Hero from "@/components/landing/Hero";
+import HowItWorks from "@/components/landing/HowItWorks";
+import Features from "@/components/landing/Features";
+import StudentSeniorSplit from "@/components/landing/StudentSeniorSplit";
+import FinalCTA from "@/components/landing/FinalCTA";
+import Footer from "@/components/landing/Footer";
 
 export default function Home() {
-  const { toast } = useToast();
-
-  const testToast = () => {
-    toast({
-      title: "✅ shadcn/ui Working!",
-      description: "All components are properly configured.",
-    });
-  };
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-br from-purple-50 to-pink-50">
-      <Card className="max-w-2xl w-full">
-        <CardHeader>
-          <CardTitle className="text-4xl font-bold text-center">
-            🌟 Aura Connect
-          </CardTitle>
-          <CardDescription className="text-center text-lg">
-            Phase 3.3 Complete - Routing Ready
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2 justify-center flex-wrap">
-            <Badge variant="secondary">✅ Next.js 14</Badge>
-            <Badge variant="secondary">✅ TypeScript</Badge>
-            <Badge variant="secondary">✅ Tailwind CSS</Badge>
-            <Badge variant="secondary">✅ shadcn/ui</Badge>
-          </div>
-          <div className="flex gap-2 justify-center flex-wrap">
-            <Badge>Socket.io Client</Badge>
-            <Badge>Daily.co SDK</Badge>
-            <Badge>Zustand</Badge>
-            <Badge>Framer Motion</Badge>
-          </div>
-
-          <div className="pt-4 space-y-2">
-            <p className="text-sm text-center text-gray-600 font-medium">
-              Test Navigation:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/student">
-                <Button variant="outline" className="w-full">
-                  👨‍🎓 Student
-                </Button>
-              </Link>
-              <Link href="/senior">
-                <Button variant="outline" className="w-full">
-                  👴 Senior
-                </Button>
-              </Link>
-              <Link href="/admin">
-                <Button variant="outline" className="w-full">
-                  📊 Admin
-                </Button>
-              </Link>
-              <Link href="/session/test-123">
-                <Button variant="outline" className="w-full">
-                  💬 Session
-                </Button>
-              </Link>
-              <Link href="/auth/login">
-                <Button variant="outline" className="w-full">
-                  🔐 Login
-                </Button>
-              </Link>
-              <Link href="/auth/signup">
-                <Button variant="outline" className="w-full">
-                  ✨ Signup
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          <div className="pt-4">
-            <Button onClick={testToast} className="w-full">
-              Test Toast Notification
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <main className="min-h-screen">
+      <Hero />
+      <HowItWorks />
+      <Features />
+      <StudentSeniorSplit />
+      <FinalCTA />
+      <Footer />
     </main>
   );
 }
