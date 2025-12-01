@@ -19,6 +19,9 @@
 import { Router } from "express";
 import {
   generateIcebreakerEndpoint,
+  generateSuggestionsEndpoint,
+  detectCrisisEndpoint,
+  analyzeSentimentEndpoint,
   analyzeStressEndpoint,
   checkSafetyEndpoint,
   shouldInterveneEndpoint,
@@ -54,6 +57,85 @@ const router = Router();
  * Cost: ~$0.014 per request (~1.4¢)
  */
 router.post("/icebreaker", validateIcebreaker, generateIcebreakerEndpoint);
+
+/**
+ * POST /api/ai/suggestions
+ *
+ * Generate conversation suggestions for seniors
+ *
+ * Request body:
+ * {
+ *   "recentMessages": [
+ *     { "sender": "student", "text": "I'm so stressed about finals" },
+ *     { "sender": "senior", "text": "That sounds tough. What's worrying you most?" },
+ *     { "sender": "student", "text": "I have 3 exams in 2 days and haven't started studying" }
+ *   ]
+ * }
+ *
+ * Response (200 OK):
+ * {
+ *   "suggestions": [
+ *     "That sounds overwhelming. Have you been able to prioritize which exam to tackle first?",
+ *     "I hear you. It's okay to feel stressed. What support do you have right now?",
+ *     "Let's break this down. What's one small step you could take today?"
+ *   ]
+ * }
+ *
+ * Model: GPT-4o (requires empathy and context awareness)
+ * Cost: ~$0.01 per request (~1¢)
+ */
+router.post("/suggestions", generateSuggestionsEndpoint);
+
+/**
+ * POST /api/ai/crisis
+ *
+ * Detect crisis keywords in student message (instant)
+ *
+ * Request body:
+ * {
+ *   "message": "I don't want to live anymore"
+ * }
+ *
+ * Response (200 OK):
+ * {
+ *   "isCrisis": true,
+ *   "severity": "critical",
+ *   "detectedKeywords": ["don't want to live"],
+ *   "interventionScript": "🚨 CRISIS DETECTED...",
+ *   "shouldNotifyAdmin": true
+ * }
+ *
+ * Model: None (keyword matching for <1ms response)
+ * Cost: $0 (no API call)
+ */
+router.post("/crisis", detectCrisisEndpoint);
+
+/**
+ * POST /api/ai/sentiment
+ *
+ * Analyze sentiment of student messages
+ *
+ * Request body:
+ * {
+ *   "messages": [
+ *     "I'm feeling really stressed today",
+ *     "Things are getting better though",
+ *     "I'm hopeful about the future"
+ *   ]
+ * }
+ *
+ * Response (200 OK):
+ * {
+ *   "score": 3,
+ *   "trend": "improving",
+ *   "confidence": 0.85,
+ *   "indicators": ["stressed", "better", "hopeful"]
+ * }
+ *
+ * Model: GPT-3.5 Turbo (simple sentiment classification)
+ * Cost: ~$0.001 per request (~0.1¢)
+ */
+router.post("/sentiment", analyzeSentimentEndpoint);
 
 /**
  * POST /api/ai/stress

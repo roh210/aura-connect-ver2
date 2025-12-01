@@ -56,11 +56,16 @@ export const createSession = async (
     });
 
     // Step 1: Create Daily.co room (parallel with AI icebreaker for speed)
-    const [roomResult, icebreaker] = await Promise.all([
+    const [roomResult, icebreakers] = await Promise.all([
       createRoom(sessionId, studentName, seniorName),
       generateIcebreaker(
-        { name: studentName, bio: "" },
-        { name: seniorName, bio: "" }
+        {
+          id: studentId,
+          role: "student",
+          displayName: studentName,
+          interests: [],
+        },
+        { id: seniorId, role: "senior", displayName: seniorName, interests: [] }
       ),
     ]);
 
@@ -73,7 +78,8 @@ export const createSession = async (
       seniorName,
       roomName: roomResult.roomName,
       roomUrl: roomResult.roomUrl,
-      icebreaker,
+      icebreakerForStudent: icebreakers.forStudent,
+      icebreakerForSenior: icebreakers.forSenior,
       status: "active",
       createdAt: new Date(),
       expiresAt: roomResult.expiresAt,
@@ -90,7 +96,8 @@ export const createSession = async (
       roomUrl: roomResult.roomUrl,
       studentToken: roomResult.studentToken,
       seniorToken: roomResult.seniorToken,
-      icebreaker,
+      icebreakerForStudent: icebreakers.forStudent,
+      icebreakerForSenior: icebreakers.forSenior,
       expiresAt: roomResult.expiresAt,
     });
   } catch (error: any) {
@@ -136,7 +143,7 @@ export const getSession = async (
       sessionId: req.params.id,
     });
 
-    next(error);
+    return next(error);
   }
 };
 

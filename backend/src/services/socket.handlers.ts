@@ -352,7 +352,7 @@ export const handleSeniorAccept = async (
       sessionId: sessionData.sessionId,
       roomUrl: sessionData.roomUrl,
       token: sessionData.studentToken,
-      icebreaker: sessionData.icebreaker,
+      icebreaker: sessionData.icebreakerForStudent,
       message: `You've been matched with ${data.seniorName}! Connecting...`,
     });
 
@@ -363,7 +363,7 @@ export const handleSeniorAccept = async (
       sessionId: sessionData.sessionId,
       roomUrl: sessionData.roomUrl,
       token: sessionData.seniorToken,
-      icebreaker: sessionData.icebreaker,
+      icebreaker: sessionData.icebreakerForSenior,
       message: `You've been matched with ${student.name}!`,
     });
 

@@ -40,7 +40,6 @@ export interface User {
   id: string;
   role: "student" | "senior";
   displayName: string;
-  age: number;
   interests?: string[];
   bio?: string;
 }
@@ -68,6 +67,13 @@ export interface SafetyCheckResult {
   recommendedAction: "monitor" | "intervene" | "emergency";
 }
 
+export interface SentimentAnalysisResult {
+  score: number; // -10 (very negative) to +10 (very positive)
+  trend: "improving" | "stable" | "declining" | "unknown";
+  confidence: number; // 0-1
+  indicators: string[]; // Key phrases that influenced the score
+}
+
 export interface InterventionDecision {
   shouldIntervene: boolean;
   reason: string;
@@ -78,10 +84,10 @@ export interface InterventionDecision {
 /**
  * 1. Generate Icebreaker (GPT-4o)
  *
- * ALGORITHM: Create personalized conversation starter
+ * ALGORITHM: Create personalized conversation starters for BOTH roles
  *
  * Input: Student + Senior profiles
- * Output: 1-2 sentence icebreaker
+ * Output: Two icebreakers (one for student, one for senior)
  * Model: GPT-4o (requires creativity and empathy)
  * Cost: ~$0.01 per call
  * Latency: ~2-3 seconds
@@ -91,38 +97,44 @@ export interface InterventionDecision {
 export async function generateIcebreaker(
   student: User,
   senior: User
-): Promise<string> {
+): Promise<{ forStudent: string; forSenior: string }> {
   try {
-    // Build context-rich prompt
-    const prompt = `You are a compassionate wellness assistant helping a stressed college student connect with a senior mentor for emotional support.
+    // Build context-rich prompt for BOTH roles
+    const prompt = `You are a compassionate wellness assistant helping create conversation starters for a peer counseling session.
 
 CONTEXT:
-- Student: ${student.displayName}, age ${student.age}
-- Senior: ${senior.displayName}, age ${senior.age}
+- Student: ${student.displayName}
+- Senior (counselor): ${senior.displayName}
 - Shared interests: ${student.interests?.join(", ") || "general conversation"}
 
 TASK:
-Generate ONE warm, appropriate conversation starter that:
-1. Relates to shared interests or life experiences
-2. Is empathetic and non-judgmental
-3. Is 1-2 sentences maximum
-4. Avoids medical/therapy language (we're not therapists)
-5. Feels natural and genuine, not scripted
+Generate TWO different icebreakers:
+1. FOR STUDENT: Welcoming message that makes them feel comfortable opening up
+2. FOR SENIOR: Conversation starter question they can ask the student
 
-FORMAT: Return ONLY the icebreaker text, no quotes, no preamble, no explanation.
+Requirements:
+- Empathetic and non-judgmental
+- 1-2 sentences maximum each
+- Avoids medical/therapy language (we're not therapists)
+- Feels natural and genuine, not scripted
+
+FORMAT: Return ONLY valid JSON, no markdown, no code blocks:
+{
+  "forStudent": "Hi [name]! I'm [senior name], and I'm here to listen...",
+  "forSenior": "You could start by asking: 'What's been on your mind lately?'"
+}
 
 EXAMPLES:
-- "Hi ${
-      student.displayName
-    }! I remember how overwhelming college could be sometimes. What are you studying?"
-- "Hey there! I noticed we both enjoy reading. Any good books lately?"
-- "Hi ${
-      student.displayName
-    }! I'm here to chat about whatever's on your mind. How's your week been?"
+{
+  "forStudent": "Hi ${student.displayName}! I'm ${
+      senior.displayName
+    }. I remember how overwhelming college could be sometimes. I'm here to listen without judgment.",
+  "forSenior": "Start with: 'What's been the most challenging part of your week?'"
+}
 
-Now generate a unique icebreaker:`;
+Now generate unique icebreakers:`;
 
-    logger.debug("Generating icebreaker", {
+    logger.debug("Generating role-specific icebreakers", {
       studentId: student.id,
       seniorId: senior.id,
       model: "gpt-4o",
@@ -132,19 +144,28 @@ Now generate a unique icebreaker:`;
       model: "openai/gpt-4o",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8, // Higher creativity (0-2 scale, 1 is default)
-      max_tokens: 100, // ~1-2 sentences
+      max_tokens: 200, // ~2 icebreakers
     });
 
-    const icebreaker = response.choices[0].message.content?.trim() || "";
+    let content = response.choices[0].message.content?.trim() || "{}";
 
-    logger.info("Icebreaker generated successfully", {
+    // Remove markdown code blocks if present
+    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+
+    const icebreakers = JSON.parse(content) as {
+      forStudent: string;
+      forSenior: string;
+    };
+
+    logger.info("Icebreakers generated successfully", {
       studentId: student.id,
       seniorId: senior.id,
-      length: icebreaker.length,
+      studentLength: icebreakers.forStudent.length,
+      seniorLength: icebreakers.forSenior.length,
       tokensUsed: response.usage?.total_tokens,
     });
 
-    return icebreaker;
+    return icebreakers;
   } catch (error) {
     logger.error("Icebreaker generation failed, using fallback", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -169,17 +190,153 @@ Now generate a unique icebreaker:`;
  *
  * Real-world example: Netflix shows "Popular" if recommendations fail
  */
-function fallbackIcebreaker(student: User, senior: User): string {
-  const templates = [
-    `Hi ${student.displayName}! I'm ${senior.displayName}, and I'm here to listen. How are you doing today?`,
-    `Hey ${student.displayName}! I'm ${senior.displayName}. What's been on your mind lately?`,
-    `Hi there! I'm ${senior.displayName}, and I'm glad we connected. What would you like to talk about?`,
+function fallbackIcebreaker(
+  student: User,
+  senior: User
+): { forStudent: string; forSenior: string } {
+  const studentTemplates = [
+    `Hi ${student.displayName}! I'm ${senior.displayName}, and I'm here to listen without judgment. Feel free to share what's on your mind.`,
+    `Hey ${student.displayName}! I'm ${senior.displayName}. I remember how tough college could be. I'm here to help however I can.`,
+    `Hi there! I'm ${senior.displayName}, and I'm glad we connected. You're not alone in this.`,
+  ];
+
+  const seniorTemplates = [
+    `Try asking: "What's been the most challenging part of your week?"`,
+    `You could start with: "How are you feeling today?"`,
+    `Consider asking: "What brought you here today?"`,
   ];
 
   // Deterministic selection (same pair always gets same fallback)
   const index =
-    (student.id.charCodeAt(0) + senior.id.charCodeAt(0)) % templates.length;
-  return templates[index];
+    (student.id.charCodeAt(0) + senior.id.charCodeAt(0)) %
+    studentTemplates.length;
+
+  return {
+    forStudent: studentTemplates[index],
+    forSenior: seniorTemplates[index],
+  };
+}
+
+/**
+ * 1.5. Generate Conversation Suggestions (GPT-4o)
+ *
+ * ALGORITHM: AI Co-Pilot for seniors - suggests 3 empathetic responses
+ *
+ * Input: Recent chat messages (last 5)
+ * Output: 3 clickable response suggestions
+ * Model: GPT-4o (requires empathy and context awareness)
+ * Cost: ~$0.01 per call
+ * Latency: ~2-3 seconds
+ *
+ * Real-world example: Gmail Smart Reply, LinkedIn comment suggestions
+ */
+export async function generateSuggestions(
+  recentMessages: Array<{ sender: "student" | "senior"; text: string }>
+): Promise<string[]> {
+  try {
+    // Build conversation context
+    const conversationContext = recentMessages
+      .map(
+        (msg) =>
+          `${msg.sender === "student" ? "Student" : "Senior"}: ${msg.text}`
+      )
+      .join("\n");
+
+    const prompt = `You are an empathetic counseling assistant helping a senior mentor respond to a stressed college student.
+
+RECENT CONVERSATION:
+${conversationContext}
+
+TASK:
+Generate 3 SHORT, empathetic response suggestions for the senior to click and send. Each should:
+1. Validate the student's feelings
+2. Ask a thoughtful follow-up question OR offer gentle support
+3. Be 1-2 sentences maximum
+4. Feel natural and conversational (not scripted/robotic)
+5. Avoid medical/therapy language (we're peers, not therapists)
+
+TONE: Warm, non-judgmental, supportive, like a caring older friend
+
+FORMAT: Return ONLY valid JSON, no markdown, no code blocks:
+{
+  "suggestions": [
+    "First suggestion here",
+    "Second suggestion here", 
+    "Third suggestion here"
+  ]
+}
+
+EXAMPLES:
+{
+  "suggestions": [
+    "That sounds really tough. What's been the hardest part for you?",
+    "I hear you. It's okay to feel overwhelmed sometimes.",
+    "Have you been able to take any breaks for yourself lately?"
+  ]
+}
+
+Now generate 3 unique suggestions:`;
+
+    logger.debug("Generating conversation suggestions", {
+      messageCount: recentMessages.length,
+      model: "gpt-4o",
+    });
+
+    const response = await openai.chat.completions.create({
+      model: "openai/gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7, // Moderate creativity (natural but consistent)
+      max_tokens: 150, // ~3 short suggestions
+    });
+
+    let content = response.choices[0].message.content?.trim() || "{}";
+
+    // Remove markdown code blocks if present
+    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+
+    const result = JSON.parse(content) as { suggestions: string[] };
+
+    logger.info("Suggestions generated successfully", {
+      count: result.suggestions.length,
+      tokensUsed: response.usage?.total_tokens,
+    });
+
+    return result.suggestions;
+  } catch (error) {
+    logger.error("Failed to generate suggestions", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    // Graceful degradation: Generic supportive suggestions
+    return fallbackSuggestions(recentMessages);
+  }
+}
+
+/**
+ * Fallback Suggestions (No AI Required)
+ *
+ * GRACEFUL DEGRADATION: If AI fails, still provide helpful suggestions
+ */
+function fallbackSuggestions(
+  recentMessages: Array<{ sender: "student" | "senior"; text: string }>
+): string[] {
+  // If student just messaged, provide responsive suggestions
+  const lastMessage = recentMessages[recentMessages.length - 1];
+
+  if (lastMessage?.sender === "student") {
+    return [
+      "I hear you. Tell me more about that.",
+      "That sounds really challenging. How are you coping?",
+      "Thanks for sharing. What would be most helpful right now?",
+    ];
+  }
+
+  // Generic conversation starters
+  return [
+    "How has your week been going?",
+    "What's been on your mind lately?",
+    "Is there anything specific you'd like to talk about?",
+  ];
 }
 
 /**
@@ -302,6 +459,236 @@ function fallbackStressAnalysis(
       "Connect with friends or mentors",
     ],
   };
+}
+
+/**
+ * Analyze Sentiment (GPT-3.5 Turbo)
+ *
+ * ALGORITHM: Score sentiment from -10 to +10 and detect trend
+ *
+ * Input: Array of student messages
+ * Output: Sentiment score, trend, confidence, indicators
+ * Model: GPT-3.5 Turbo (simple classification, fast and cheap)
+ * Cost: ~$0.001 per call
+ * Latency: ~1 second
+ *
+ * Real-world example: Twitter sentiment analysis for brand monitoring
+ */
+export async function analyzeSentiment(
+  messages: string[]
+): Promise<SentimentAnalysisResult> {
+  try {
+    // Need at least 1 message to analyze
+    if (!messages || messages.length === 0) {
+      return {
+        score: 0,
+        trend: "unknown",
+        confidence: 0,
+        indicators: [],
+      };
+    }
+
+    const prompt = `You are a sentiment analysis assistant for a peer counseling platform. Analyze the emotional tone of these student messages and provide:
+
+MESSAGES (chronological order):
+${messages.map((msg, i) => `${i + 1}. "${msg}"`).join("\n")}
+
+YOUR TASK:
+1. Score overall sentiment from -10 to +10:
+   - (-10 to -6): Very negative (despair, hopelessness, severe distress)
+   - (-5 to -1): Negative (frustration, sadness, mild distress)
+   - (0): Neutral (factual, calm, balanced)
+   - (1 to 5): Positive (hopeful, grateful, content)
+   - (6 to 10): Very positive (joyful, excited, thriving)
+
+2. Determine trend (if multiple messages):
+   - "improving": Sentiment is getting more positive over time
+   - "stable": Sentiment remains consistent
+   - "declining": Sentiment is getting more negative over time
+   - "unknown": Only one message or unclear pattern
+
+3. Identify key indicators (specific words/phrases that influenced your score)
+
+4. Rate your confidence (0-1) in this analysis
+
+Return ONLY valid JSON with this exact structure:
+{
+  "score": <number from -10 to 10>,
+  "trend": "<improving|stable|declining|unknown>",
+  "confidence": <number from 0 to 1>,
+  "indicators": ["<phrase1>", "<phrase2>", ...]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "openai/gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3, // Lower = more consistent
+      max_tokens: 300,
+    });
+
+    const rawContent = response.choices[0]?.message?.content?.trim();
+    if (!rawContent) {
+      throw new Error("Empty response from OpenRouter");
+    }
+
+    // Parse JSON response
+    const result = JSON.parse(rawContent);
+
+    // Validate response structure
+    if (
+      typeof result.score !== "number" ||
+      !["improving", "stable", "declining", "unknown"].includes(result.trend) ||
+      typeof result.confidence !== "number" ||
+      !Array.isArray(result.indicators)
+    ) {
+      throw new Error("Invalid response structure from AI");
+    }
+
+    logger.info("Sentiment analysis completed", {
+      messageCount: messages.length,
+      score: result.score,
+      trend: result.trend,
+      confidence: result.confidence,
+    });
+
+    return result;
+  } catch (error: any) {
+    logger.error("Sentiment analysis failed", {
+      error: error.message,
+      messageCount: messages.length,
+    });
+
+    // Fallback: Simple keyword-based sentiment
+    return fallbackSentimentAnalysis(messages);
+  }
+}
+
+/**
+ * Fallback Sentiment Analysis (Keyword Matching)
+ *
+ * Used when GPT-3.5 API fails
+ */
+function fallbackSentimentAnalysis(
+  messages: string[]
+): SentimentAnalysisResult {
+  if (!messages || messages.length === 0) {
+    return {
+      score: 0,
+      trend: "unknown",
+      confidence: 0,
+      indicators: [],
+    };
+  }
+
+  const positiveKeywords = [
+    "happy",
+    "good",
+    "great",
+    "thank",
+    "better",
+    "hope",
+    "excited",
+    "grateful",
+    "love",
+    "amazing",
+    "wonderful",
+  ];
+
+  const negativeKeywords = [
+    "sad",
+    "bad",
+    "terrible",
+    "hate",
+    "angry",
+    "frustrated",
+    "hopeless",
+    "depressed",
+    "anxious",
+    "scared",
+    "worried",
+    "awful",
+  ];
+
+  let totalScore = 0;
+  const indicators: string[] = [];
+
+  messages.forEach((msg) => {
+    const lowerMsg = msg.toLowerCase();
+
+    positiveKeywords.forEach((keyword) => {
+      if (lowerMsg.includes(keyword)) {
+        totalScore += 1;
+        if (!indicators.includes(keyword)) {
+          indicators.push(keyword);
+        }
+      }
+    });
+
+    negativeKeywords.forEach((keyword) => {
+      if (lowerMsg.includes(keyword)) {
+        totalScore -= 1;
+        if (!indicators.includes(keyword)) {
+          indicators.push(keyword);
+        }
+      }
+    });
+  });
+
+  // Normalize score to -10 to +10 range
+  const normalizedScore = Math.max(-10, Math.min(10, totalScore));
+
+  // Calculate trend (if multiple messages)
+  let trend: "improving" | "stable" | "declining" | "unknown" = "unknown";
+  if (messages.length >= 3) {
+    const firstHalfScore = calculateKeywordScore(
+      messages.slice(0, Math.floor(messages.length / 2)),
+      positiveKeywords,
+      negativeKeywords
+    );
+    const secondHalfScore = calculateKeywordScore(
+      messages.slice(Math.floor(messages.length / 2)),
+      positiveKeywords,
+      negativeKeywords
+    );
+
+    if (secondHalfScore > firstHalfScore + 1) {
+      trend = "improving";
+    } else if (secondHalfScore < firstHalfScore - 1) {
+      trend = "declining";
+    } else {
+      trend = "stable";
+    }
+  }
+
+  return {
+    score: normalizedScore,
+    trend,
+    confidence: 0.6, // Lower confidence for keyword-based approach
+    indicators,
+  };
+}
+
+/**
+ * Helper: Calculate keyword score for a set of messages
+ */
+function calculateKeywordScore(
+  messages: string[],
+  positiveKeywords: string[],
+  negativeKeywords: string[]
+): number {
+  let score = 0;
+
+  messages.forEach((msg) => {
+    const lowerMsg = msg.toLowerCase();
+    positiveKeywords.forEach((keyword) => {
+      if (lowerMsg.includes(keyword)) score += 1;
+    });
+    negativeKeywords.forEach((keyword) => {
+      if (lowerMsg.includes(keyword)) score -= 1;
+    });
+  });
+
+  return score;
 }
 
 /**
