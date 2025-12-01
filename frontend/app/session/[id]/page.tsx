@@ -18,6 +18,7 @@ import * as socketService from "@/services/socket.service";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import VoiceCall from "@/components/VoiceCall";
 import ResponseLevelSelector from "@/components/ResponseLevelSelector";
+import TechniqueCard from "@/components/TechniqueCard";
 import CrisisAlert from "@/components/CrisisAlert";
 import SentimentMeter from "@/components/SentimentMeter";
 import { Lightbulb } from "lucide-react";
@@ -92,6 +93,14 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const lastProcessedLength = useRef(0);
   const isFetchingResponses = useRef(false);
 
+  // Technique Coaching state (Phase 8B.6)
+  const [techniqueCoaching, setTechniqueCoaching] = useState<{
+    technique: string;
+    explanation: string;
+    example: string;
+  } | null>(null);
+  const studentMessageCount = useRef(0);
+
   // Crisis Detection state (Phase 8A.5)
   const [crisisData, setCrisisData] = useState<{
     severity: "critical" | "high" | "medium" | "low" | null;
@@ -164,6 +173,79 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     const timeoutId = setTimeout(fetchResponses, 300);
     return () => clearTimeout(timeoutId);
   }, [messages, userRole]);
+
+  // Fetch technique coaching every 3rd student message (Phase 8B.6)
+  useEffect(() => {
+    const checkTechnique = async () => {
+      // Only for seniors
+      if (userRole !== "senior") return;
+
+      // Count student messages
+      const currentCount = messages.filter(
+        (m) => m.sender === "student"
+      ).length;
+
+      // Clear coaching card if user dismissed it or sent a message
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.sender === "senior" && techniqueCoaching) {
+        // Senior responded, clear the coaching card
+        setTechniqueCoaching(null);
+        return;
+      }
+
+      // Only check every 3rd student message
+      if (
+        currentCount > studentMessageCount.current &&
+        currentCount % 3 === 0
+      ) {
+        studentMessageCount.current = currentCount;
+
+        try {
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/ai/technique-coach`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                recentMessages: messages
+                  .filter((msg) => msg.sender !== "system")
+                  .slice(-6)
+                  .map((msg) => ({
+                    sender: msg.sender,
+                    text: msg.text,
+                  })),
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            console.error("Technique coaching failed:", response.statusText);
+            return;
+          }
+
+          const result = await response.json();
+
+          if (result.shouldCoach) {
+            setTechniqueCoaching({
+              technique: result.technique,
+              explanation: result.explanation,
+              example: result.example,
+            });
+          } else {
+            // AI decided no coaching needed
+            setTechniqueCoaching(null);
+          }
+        } catch (error) {
+          console.error("Technique coaching error:", error);
+          // Silently fail - coaching is optional
+        }
+      }
+    };
+
+    // Debounce technique checks
+    const timeoutId = setTimeout(checkTechnique, 500);
+    return () => clearTimeout(timeoutId);
+  }, [messages, userRole, techniqueCoaching]);
 
   // Voice call data (roomUrl and token from matched event)
   const [callData, setCallData] = useState<{
@@ -355,6 +437,16 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     setInputMessage(draft);
   };
 
+  // Handle technique coaching actions (Phase 8B.6)
+  const handleUseTechnique = (example: string) => {
+    setInputMessage(example);
+    setTechniqueCoaching(null);
+  };
+
+  const handleDismissTechnique = () => {
+    setTechniqueCoaching(null);
+  };
+
   const handleToggleVoice = () => {
     setIsVoiceActive(!isVoiceActive);
     toast({
@@ -474,6 +566,19 @@ export default function SessionPage({ params }: { params: { id: string } }) {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Technique Coaching Card (Phase 8B.6) - Only for seniors */}
+          {userRole === "senior" && techniqueCoaching && (
+            <div className="mb-4">
+              <TechniqueCard
+                technique={techniqueCoaching.technique}
+                explanation={techniqueCoaching.explanation}
+                example={techniqueCoaching.example}
+                onUse={handleUseTechnique}
+                onDismiss={handleDismissTechnique}
+              />
+            </div>
           )}
 
           {/* Multi-Level Response Selector (Phase 8B.5) - Only for seniors */}

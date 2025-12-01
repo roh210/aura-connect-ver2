@@ -80,6 +80,13 @@ export interface MultiLevelResponses {
   aiDraft: string; // 1 full response (2-3 sentences, < 200 chars)
 }
 
+export interface TechniqueCoaching {
+  shouldCoach: boolean;
+  technique?: string; // Active Listening, Validation, Open-Ended Questions, Reframing, Grounding
+  explanation?: string; // Why this technique helps (< 80 chars)
+  example?: string; // Concrete example response from conversation
+}
+
 export interface InterventionDecision {
   shouldIntervene: boolean;
   reason: string;
@@ -390,6 +397,121 @@ function fallbackSuggestions(
     aiDraft:
       "How has your week been going? I'm here to listen and support you. Feel free to share whatever is on your mind.",
   };
+}
+
+/**
+ * 1.6. Detect Technique Coaching Opportunity (GPT-4o-mini)
+ *
+ * ALGORITHM: Analyze conversation to suggest counseling techniques
+ *
+ * Input: Recent messages (last 6)
+ * Output: Technique suggestion with example
+ * Model: GPT-4o-mini (good at pattern recognition)
+ * Cost: ~$0.002 per call
+ * Latency: ~1-2 seconds
+ *
+ * Real-world example: Grammarly's writing suggestions
+ */
+export async function detectTechniqueOpportunity(
+  recentMessages: Array<{ sender: "student" | "senior"; text: string }>
+): Promise<TechniqueCoaching> {
+  try {
+    // Get last 6 messages for context
+    const lastMessages = recentMessages.slice(-6);
+    const conversationContext = lastMessages
+      .map(
+        (msg) =>
+          `${msg.sender === "student" ? "Student" : "Senior"}: ${msg.text}`
+      )
+      .join("\n");
+
+    // Get last student message
+    const studentMessages = lastMessages.filter(
+      (msg) => msg.sender === "student"
+    );
+    const lastStudentMessage =
+      studentMessages[studentMessages.length - 1]?.text || "";
+
+    const prompt = `You are coaching a peer counselor (college senior). Analyze if they could benefit from a specific counseling technique RIGHT NOW.
+
+RECENT CONVERSATION:
+${conversationContext}
+
+STUDENT'S LAST MESSAGE: "${lastStudentMessage}"
+
+COUNSELING TECHNIQUES:
+1. Active Listening - Reflect back what you hear ("It sounds like you're feeling...")
+2. Validation - Acknowledge feelings are valid ("That makes complete sense given...")
+3. Open-Ended Questions - Explore deeper ("What would help you most right now?")
+4. Reframing - Offer alternative perspective ("Another way to look at it...")
+5. Grounding - Focus on present moment ("What's one thing you can control today?")
+
+IMPORTANT: 
+- Only suggest ONE technique that would be MOST helpful right now
+- The senior hasn't already used this technique in the conversation
+- Your example MUST use specific words/details from the student's actual message
+- Make the example feel natural and conversational, not robotic
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{
+  "shouldCoach": true/false,
+  "technique": "Active Listening",
+  "explanation": "Why it helps here (under 80 chars)",
+  "example": "Specific response using actual details from their message"
+}
+
+Example good response:
+Student: "I have 3 exams and a project due tomorrow"
+{
+  "shouldCoach": true,
+  "technique": "Active Listening",
+  "explanation": "Reflecting their stress helps them feel heard",
+  "example": "It sounds like you're feeling overwhelmed with 3 exams and a project all due tomorrow"
+}
+
+If no coaching needed (senior is already doing well), return: {"shouldCoach": false}`;
+
+    logger.debug("Detecting technique opportunity", {
+      messageCount: recentMessages.length,
+      model: "gpt-4o-mini",
+    });
+
+    const response = await openai.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7, // Higher creativity for varied examples
+      max_tokens: 300,
+    });
+
+    let content = response.choices[0].message.content?.trim() || "{}";
+
+    // Remove markdown code blocks if present
+    content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+
+    const result = JSON.parse(content) as TechniqueCoaching;
+
+    // Validate structure
+    if (result.shouldCoach) {
+      if (!result.technique || !result.explanation || !result.example) {
+        throw new Error("Invalid coaching format");
+      }
+    }
+
+    logger.info("Technique coaching analyzed", {
+      shouldCoach: result.shouldCoach,
+      technique: result.technique || "none",
+      tokensUsed: response.usage?.total_tokens,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error("Failed to detect technique opportunity", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    // Graceful degradation: No coaching if AI fails
+    return { shouldCoach: false };
+  }
 }
 
 /**

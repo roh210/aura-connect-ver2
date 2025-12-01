@@ -25,6 +25,7 @@ import {
   analyzeStressEndpoint,
   checkSafetyEndpoint,
   shouldInterveneEndpoint,
+  detectTechniqueEndpoint,
 } from "../controllers/ai.controller";
 import {
   validateIcebreaker,
@@ -136,6 +137,32 @@ router.post("/crisis", detectCrisisEndpoint);
  * Cost: ~$0.001 per request (~0.1¢)
  */
 router.post("/sentiment", analyzeSentimentEndpoint);
+
+/**
+ * POST /api/ai/technique-coach
+ *
+ * Detect counseling technique coaching opportunities
+ *
+ * Request body:
+ * {
+ *   "recentMessages": [
+ *     { "sender": "student", "text": "I just feel so overwhelmed" },
+ *     { "sender": "senior", "text": "What's going on?" }
+ *   ]
+ * }
+ *
+ * Response (200 OK):
+ * {
+ *   "shouldCoach": true,
+ *   "technique": "Active Listening",
+ *   "explanation": "Reflecting their feelings helps them feel heard",
+ *   "example": "It sounds like you're feeling overwhelmed by everything right now"
+ * }
+ *
+ * Model: GPT-4o-mini (pattern recognition)
+ * Cost: ~$0.002 per request (~0.2¢)
+ */
+router.post("/technique-coach", detectTechniqueEndpoint);
 
 /**
  * POST /api/ai/stress

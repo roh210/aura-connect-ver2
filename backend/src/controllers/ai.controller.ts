@@ -19,6 +19,7 @@ import {
   analyzeSentiment,
   checkSafety,
   shouldIntervene,
+  detectTechniqueOpportunity,
 } from "../services/openai.service";
 import { logger } from "../config/logger";
 
@@ -261,6 +262,45 @@ export const analyzeSentimentEndpoint = async (
     res.json(result);
   } catch (error: any) {
     logger.error("Failed to analyze sentiment", {
+      error: error.message,
+      body: req.body,
+    });
+
+    return next(error);
+  }
+};
+
+/**
+ * POST /api/ai/technique-coach
+ *
+ * Detect counseling technique coaching opportunities
+ */
+export const detectTechniqueEndpoint = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { recentMessages } = req.body;
+
+    // Validate input
+    if (!Array.isArray(recentMessages)) {
+      return res.status(400).json({
+        error: "recentMessages must be an array",
+      });
+    }
+
+    const result = await detectTechniqueOpportunity(recentMessages);
+
+    logger.info("Technique coaching completed", {
+      messageCount: recentMessages.length,
+      shouldCoach: result.shouldCoach,
+      technique: result.technique || "none",
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    logger.error("Failed to detect technique", {
       error: error.message,
       body: req.body,
     });
