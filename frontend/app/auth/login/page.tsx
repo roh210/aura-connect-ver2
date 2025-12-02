@@ -83,20 +83,30 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-purple-50 to-pink-50">
-      <Card className="max-w-md w-full">
+    <main className="min-h-screen flex items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+      {/* Holographic Gradient Background - matching landing page */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/50 via-purple-800/50 to-pink-900/50 animate-pulse" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.3),transparent_50%)]" />
+      </div>
+
+      <Card className="max-w-md w-full relative z-10 bg-gray-800/80 backdrop-blur-lg border-purple-500/30">
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold text-center">
-            🔐 Login
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+              🔐 Login
+            </span>
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-gray-300">
             Sign in to Aura Connect
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-gray-200">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -105,11 +115,14 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-gray-200">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -118,20 +131,25 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 min-h-[44px]"
+              disabled={loading}
+            >
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
           <div className="mt-4 text-center text-sm">
-            <p className="text-gray-600">
+            <p className="text-gray-300">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/signup"
-                className="text-purple-600 hover:underline font-medium"
+                className="text-purple-400 hover:text-pink-400 hover:underline font-medium transition-colors"
               >
                 Sign up
               </Link>

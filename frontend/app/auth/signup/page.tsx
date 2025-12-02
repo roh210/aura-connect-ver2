@@ -109,13 +109,21 @@ export default function SignupPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-purple-50 to-pink-50">
-      <Card className="max-w-md w-full">
+    <main className="min-h-screen flex items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+      {/* Holographic Gradient Background - matching landing page */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/50 via-purple-800/50 to-pink-900/50 animate-pulse" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.3),transparent_50%)]" />
+      </div>
+
+      <Card className="max-w-md w-full relative z-10 bg-gray-800/80 backdrop-blur-lg border-purple-500/30">
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold text-center">
-            ✨ Sign Up
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+              ✨ Sign Up
+            </span>
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-gray-300">
             Create your Aura Connect account
           </CardDescription>
         </CardHeader>
@@ -123,15 +131,17 @@ export default function SignupPage() {
           <form onSubmit={handleSignup} className="space-y-4">
             {/* Role Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">I am a...</label>
+              <label className="text-sm font-medium text-gray-200">
+                I am a...
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setRole("student")}
-                  className={`p-3 border-2 rounded-md text-center transition-all ${
+                  className={`p-3 border-2 rounded-md text-center transition-all min-h-[44px] ${
                     role === "student"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-purple-400 bg-purple-600/30 text-white shadow-lg shadow-purple-500/20"
+                      : "border-purple-500/30 bg-gray-700/30 text-gray-300 hover:border-purple-400 hover:bg-purple-600/20"
                   }`}
                 >
                   <div className="text-2xl mb-1">👨‍🎓</div>
@@ -140,10 +150,10 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setRole("senior")}
-                  className={`p-3 border-2 rounded-md text-center transition-all ${
+                  className={`p-3 border-2 rounded-md text-center transition-all min-h-[44px] ${
                     role === "senior"
-                      ? "border-purple-500 bg-purple-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-pink-400 bg-pink-600/30 text-white shadow-lg shadow-pink-500/20"
+                      : "border-purple-500/30 bg-gray-700/30 text-gray-300 hover:border-pink-400 hover:bg-pink-600/20"
                   }`}
                 >
                   <div className="text-2xl mb-1">👴</div>
@@ -154,7 +164,9 @@ export default function SignupPage() {
 
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name" className="text-gray-200">
+                Full Name
+              </Label>
               <Input
                 id="name"
                 type="text"
@@ -163,12 +175,15 @@ export default function SignupPage() {
                 onChange={(e) => setName(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-gray-200">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -183,12 +198,15 @@ export default function SignupPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
             {/* Password */}
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-gray-200">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -197,12 +215,15 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
             {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-gray-200">
+                Confirm Password
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -211,22 +232,27 @@ export default function SignupPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={loading}
                 required
+                className="bg-gray-700/50 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 min-h-[44px]"
+              disabled={loading}
+            >
               {loading ? "Creating account..." : "Create Account"}
             </Button>
           </form>
 
           <div className="mt-4 text-center text-sm">
-            <p className="text-gray-600">
+            <p className="text-gray-300">
               Already have an account?{" "}
               <Link
                 href="/auth/login"
-                className="text-purple-600 hover:underline font-medium"
+                className="text-purple-400 hover:text-pink-400 hover:underline font-medium transition-colors"
               >
-                Sign in
+                Login
               </Link>
             </p>
           </div>
