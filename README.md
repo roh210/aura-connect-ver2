@@ -1,217 +1,138 @@
-# 🌟 Aura Connect - Where Wisdom Meets Wellness
+# 🌟 Aura Connect - AI-Powered Peer Wellness Platform
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.0.4-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-green)](https://openai.com/)
-[![Daily.co](https://img.shields.io/badge/Daily.co-Voice-purple)](https://daily.co/)
+> **Real-time peer support platform connecting stressed students with experienced seniors through AI-assisted chat and voice.**
 
-> **Proactive AI wellness platform connecting stressed students with experienced seniors for meaningful 10-minute conversations.**
+## ✨ Features
 
-## 🎯 The Problem
+### Student Experience
 
-- **60%** of college students experience overwhelming anxiety
-- Traditional support is **reactive** - waiting for crisis
-- Students need **immediate**, **human connection** during stress
+- 🚀 **Instant Matching** - Connect with a senior in <2 minutes
+- 💬 **Real-time Chat** - Text-based conversations with message history
+- 🎙️ **Voice Calls** - Seamless voice chat powered by Daily.co
+- 🤖 **AI Icebreakers** - Personalized conversation starters
+- 🔒 **Safe & Anonymous** - No personal info shared
 
-## 💡 Our Solution
+### Senior Experience
 
-**Aura Connect** is an agentic AI wellness companion that:
+- 🎯 **Smart Availability** - Toggle online status with one tap
+- 💡 **AI Response Assistance** - Get suggestion levels (Quick/Guided/Draft)
+- 📚 **Technique Coaching** - Real-time counseling tips
+- 📊 **Sentiment Tracking** - Live student mood analysis
+- 🚨 **Crisis Detection** - Automatic alerts for concerning language
 
-- ✅ **Monitors** student stress autonomously (calendar integration)
-- ✅ **Analyzes** stress levels intelligently (AI stress scoring)
-- ✅ **Decides** when intervention helps (proactive suggestions)
-- ✅ **Acts** without prompting (autonomous notifications)
-- ✅ **Connects** students with seniors in <2 minutes
+### AI-Powered Tools
 
-## 🤖 Agentic AI Features
-
-### 5 Autonomous AI Tools (OpenAI Router)
-
-1. **Icebreaker Generation** (GPT-4o)
-   - Generates personalized conversation starters
-   - Matches student context with senior experience
-2. **Stress Analysis** (GPT-3.5 Turbo)
-   - Analyzes calendar events for stress indicators
-   - Scores 0-10 based on workload density
-3. **Safety Moderation** (GPT-4o)
-   - Real-time crisis detection in messages
-   - Automatic resource display for emergencies
-4. **Voice Transcription** (Whisper)
-   - Converts voice calls to text for safety review
-   - Enables post-call analysis
-5. **Proactive Intervention** (GPT-4o)
-   - Autonomous decision-making for outreach
-   - Learns optimal timing for notifications
-
-## 🎨 Features
-
-### For Students
-
-- 📅 **Smart Calendar Integration** - AI detects stressful weeks
-- 🔔 **Proactive Notifications** - Aura reaches out before crisis
-- 💬 **Instant Matching** - Connected in <2 minutes
-- 🎙️ **Voice or Text** - Choose your comfort level
-- 🛡️ **Safety First** - Crisis resources always visible
-
-### For Seniors
-
-- 🎯 **One-Tap Availability** - Animated button interface
-- 👥 **Meaningful Impact** - Help students through tough times
-- ⏱️ **10-Minute Sessions** - Manageable time commitment
-- 🎨 **Beautiful UX** - Apple-level design quality
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   FRONTEND (Next.js)                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   Student    │  │   Senior     │  │   Landing    │  │
-│  │   Portal     │  │   Portal     │  │     Page     │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-│           │                 │                 │          │
-│           └─────────────────┴─────────────────┘          │
-│                           │                              │
-└───────────────────────────┼──────────────────────────────┘
-                            │
-                    Socket.io / REST API
-                            │
-┌───────────────────────────┼──────────────────────────────┐
-│                   BACKEND (Node.js)                      │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │          OpenAI Router (Agentic AI)              │   │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  │   │
-│  │  │GPT-4o│ │GPT-3.5│ │GPT-4o│ │Whisper│ │GPT-4o│  │   │
-│  │  │Ice-  │ │Stress│ │Safety│ │Trans-│ │Inter-│  │   │
-│  │  │break │ │ Score│ │Check │ │cribe │ │vene  │  │   │
-│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘  │   │
-│  └──────────────────────────────────────────────────┘   │
-│           │              │              │                │
-│  ┌────────┴────┐  ┌──────┴─────┐  ┌────┴─────┐         │
-│  │  Socket.io  │  │  Daily.co  │  │ Firebase │         │
-│  │  (Chat)     │  │  (Voice)   │  │ (Data)   │         │
-│  └─────────────┘  └────────────┘  └──────────┘         │
-└─────────────────────────────────────────────────────────┘
-```
+- **Icebreaker Generator** - Personalized conversation starters (GPT-4o)
+- **Multi-Level Responses** - 3 levels of AI assistance for seniors
+- **Counseling Technique Coach** - Active listening, validation, etc.
+- **Crisis Detection** - Real-time safety monitoring
+- **Sentiment Analysis** - Track conversation mood
 
 ## 🚀 Tech Stack
 
-### Frontend
+**Frontend:** Next.js 14, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion  
+**Backend:** Node.js, Express, Socket.io, OpenAI API, Daily.co API  
+**Database:** Firebase Firestore  
+**Auth:** Firebase Authentication
 
-- **Next.js 14** - React framework with TypeScript
-- **Framer Motion** - Cinematic animations (60fps)
-- **shadcn/ui** - Accessible component library
-- **Tailwind CSS** - Apple-inspired design system
-- **Socket.io Client** - Real-time text chat
-- **Daily.co SDK** - Professional voice calling
-- **Zustand** - State management
-
-### Backend
-
-- **Node.js 18** - Runtime environment
-- **Express** - Web framework
-- **Socket.io** - WebSocket server
-- **OpenAI API** - Agentic AI tools
-- **Daily.co API** - Voice room creation
-- **Firebase Firestore** - Database
-- **Winston** - Production logging
-- **Joi** - Request validation
-
-## 📦 Installation
+## 📦 Setup
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
-- OpenAI API key
-- Daily.co account (free tier)
-- Firebase project
+- OpenAI API key ([get here](https://platform.openai.com/api-keys))
+- Daily.co API key ([get here](https://dashboard.daily.co))
+- Firebase project ([create here](https://console.firebase.google.com))
 
-### Backend Setup
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/roh210/aura-connect-ver2.git
+cd aura-connect-ver2
+
+# Install backend
+cd backend
+npm install
+
+# Install frontend
+cd ../frontend
+npm install
+```
+
+### 2. Backend Configuration
 
 ```bash
 cd backend
 
-# Install dependencies
-npm install
+# Create .env file
+OPENAI_API_KEY=your_openai_key
+DAILY_API_KEY=your_daily_key
+PORT=3000
 
-# Create environment file
-cp .env.example .env
-
-# Add your API keys to .env
-# - OPENAI_API_KEY
-# - DAILY_API_KEY
-# - FIREBASE_PROJECT_ID
-
-# Add Firebase service account key
+# Add firebase-key.json
 # Download from Firebase Console → Project Settings → Service Accounts
-# Save as firebase-key.json in backend root
-
-# Run development server
-npm run dev
 ```
 
-### Frontend Setup
+### 3. Frontend Configuration
 
 ```bash
 cd frontend
 
-# Install dependencies
-npm install
+# Create .env.local
+NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+```
 
-# Create environment file
-cp .env.local.example .env.local
+### 4. Run Development
 
-# Add backend URL
-# NEXT_PUBLIC_API_URL=http://localhost:3000
+```bash
+# Terminal 1 - Backend
+cd backend
+npm run dev
 
-# Run development server
+# Terminal 2 - Frontend
+cd frontend
 npm run dev
 ```
 
-Visit `http://localhost:3001` for frontend, `http://localhost:3000` for backend.
+Visit **http://localhost:3001** to use the app.
 
-## 🛡️ Ethics & Safety
+## 🚢 Deployment
 
-### Voice Calling Safeguards
+### Recommended: Vercel (Frontend) + Render (Backend)
 
-1. ✅ **Explicit Consent** - Required before every call
-2. ✅ **Recording Disclosure** - Prominently displayed
-3. ✅ **Opt-Out Available** - Switch to text anytime
-4. ✅ **Time Limits** - 10-minute maximum (hard cutoff)
-5. ✅ **Content Moderation** - AI monitors for crisis language
-6. ✅ **Senior Protection** - No personal info exchange
-7. ✅ **Student Protection** - No diagnosis/prescriptions
-8. ✅ **Crisis Resources** - Always visible, one-click access
+**Backend (Render):**
 
-### Crisis Resources
+1. Push to GitHub
+2. Create Web Service on [Render](https://render.com)
+3. Root directory: `backend`
+4. Build: `npm install`
+5. Start: `npm start`
+6. Add environment variables
 
-- 🇺🇸 **US**: 988 (Suicide & Crisis Lifeline)
-- 🇬🇧 **UK**: 116 123 (Samaritans)
-- 🇨🇦 **Canada**: 1-833-456-4566 (Crisis Services)
+**Frontend (Vercel):**
 
-## 📊 Impact
+1. Import repo on [Vercel](https://vercel.com)
+2. Root directory: `frontend`
+3. Framework: Next.js (auto-detected)
+4. Add environment variables
+5. Set `NEXT_PUBLIC_API_URL` to Render backend URL
+6. Deploy!
 
-- **2,000+** connections made
-- **40%** average stress reduction
-- **<2 minutes** average match time
-- **10,000+** minutes of conversations
+## 🛡️ Safety Features
 
-## 🎥 Demo
-
-[Live Demo](https://auraconnect.vercel.app) | [Demo Video](https://youtu.be/your-demo)
+- ✅ **Crisis Detection** - AI monitors for concerning language
+- ✅ **Resource Access** - Crisis hotlines always visible
+- ✅ **Anonymous Chat** - No personal info exchange
+- ✅ **Voice Recording Consent** - Explicit opt-in required
+- ✅ **Session Time Limits** - Prevents burnout
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file
-
-## 🙏 Acknowledgments
-
-- OpenAI for GPT-4o and Whisper APIs
-- Daily.co for voice infrastructure
-- shadcn for beautiful UI components
-- Firebase for database services
+MIT License
 
 ---
 
-**Built with ❤️ for the OpenAI Hackathon**
+**Built for meaningful peer connections 💙**

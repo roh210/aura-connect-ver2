@@ -83,7 +83,7 @@ app.use(helmet());
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? "https://aura-connect.com" // Only your frontend in production
+      ? process.env.FRONTEND_URL || "https://aura-connect.com" // Your Railway/Vercel frontend URL
       : "*", // Allow all origins in development (localhost, etc.)
   credentials: true, // Allow cookies
 };
