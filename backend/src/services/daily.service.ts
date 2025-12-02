@@ -23,8 +23,8 @@
 
 import axios from "axios";
 import { randomUUID } from "crypto";
-import { env } from "@/config/env";
-import { logger } from "@/config/logger";
+import { env } from "../config/env";
+import { logger } from "../config/logger";
 
 /**
  * Daily.co API Configuration

@@ -22,8 +22,8 @@
  * - Uber surge pricing algorithm
  */
 
-import { openai } from "@/config/env";
-import { logger } from "@/config/logger";
+import { openai } from "../config/env";
+import { logger } from "../config/logger";
 
 /**
  * Type Definitions
