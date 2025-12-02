@@ -226,20 +226,22 @@ export default function SeniorDashboard() {
   }
 
   return (
-    <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-purple-50">
+    <main className="min-h-screen p-3 sm:p-6 lg:p-8 bg-gradient-to-br from-blue-50 to-purple-50">
       {/* Connection Status Indicator */}
       <ConnectionStatus isConnected={isConnected} />
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Header with Welcome & Logout */}
-        <div className="flex justify-between items-center">
-          <div className="text-center flex-1 space-y-2">
-            <h1 className="text-4xl font-bold">👴 Senior Dashboard</h1>
-            <p className="text-gray-600">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="text-center sm:text-left flex-1 space-y-1 sm:space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
+              👴 Senior Dashboard
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">
               Welcome back,{" "}
               <span className="font-semibold text-blue-600">{userName}</span>!
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Make a difference by sharing your wisdom and experience
             </p>
           </div>
@@ -249,7 +251,7 @@ export default function SeniorDashboard() {
               await signOut();
               router.push("/auth/login");
             }}
-            className="ml-4"
+            className="min-h-[44px] w-full sm:w-auto sm:ml-4"
           >
             Log Out
           </Button>
@@ -277,7 +279,7 @@ export default function SeniorDashboard() {
             <Button
               onClick={handleToggleAvailability}
               size="lg"
-              className="w-full text-lg h-14"
+              className="w-full text-base sm:text-lg h-14 min-h-[48px]"
               variant={availability === "online" ? "destructive" : "default"}
             >
               {availability === "offline" ? "🌟 Go Online" : "⏸️ Go Offline"}
@@ -286,7 +288,7 @@ export default function SeniorDashboard() {
         </Card>
 
         {/* Statistics */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="text-center space-y-1">
@@ -378,7 +380,7 @@ export default function SeniorDashboard() {
                             request.matchRequestId
                           )
                         }
-                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        className="flex-1 bg-green-600 hover:bg-green-700 min-h-[48px]"
                       >
                         ✓ Accept
                       </Button>
@@ -390,7 +392,7 @@ export default function SeniorDashboard() {
                           )
                         }
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-h-[48px]"
                       >
                         ✕ Decline
                       </Button>

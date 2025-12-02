@@ -11,6 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +27,7 @@ import ResponseLevelSelector from "@/components/ResponseLevelSelector";
 import TechniqueCard from "@/components/TechniqueCard";
 import CrisisAlert from "@/components/CrisisAlert";
 import SentimentMeter from "@/components/SentimentMeter";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, BookOpen, CheckCircle, X, Sparkles } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -78,6 +84,19 @@ export default function SessionPage({ params }: { params: { id: string } }) {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const dailyCallRef = useRef<any>(null);
+
+  // Auto-scroll to bottom when messages change (smooth like AI chat systems)
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+        inline: "nearest",
+      });
+    }
+  }, [messages]);
 
   // AI Icebreaker state
   const [icebreaker, setIcebreaker] = useState<string>("");
@@ -447,17 +466,32 @@ export default function SessionPage({ params }: { params: { id: string } }) {
     setTechniqueCoaching(null);
   };
 
-  const handleToggleVoice = () => {
-    setIsVoiceActive(!isVoiceActive);
-    toast({
-      title: isVoiceActive ? "📞 Voice disconnected" : "📞 Voice connected",
-      description: isVoiceActive
-        ? "Switched to text chat"
-        : "Voice call started",
-    });
+  const handleToggleMute = () => {
+    if (dailyCallRef.current && isVoiceActive) {
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      dailyCallRef.current.setLocalAudio(!newMutedState);
+
+      toast({
+        title: newMutedState ? "🔇 Muted" : "🎤 Unmuted",
+        description: newMutedState
+          ? "Your microphone is now off"
+          : "Your microphone is now on",
+      });
+    }
   };
 
-  const handleEndSession = () => {
+  const handleEndSession = async () => {
+    // Disconnect voice call first if active
+    if (dailyCallRef.current && isVoiceActive) {
+      try {
+        await dailyCallRef.current.leave();
+        console.log("📞 Voice call disconnected");
+      } catch (err) {
+        console.error("Failed to disconnect voice call:", err);
+      }
+    }
+
     // Emit end_session event to backend
     socket.endSession?.(params.id);
 
@@ -469,18 +503,13 @@ export default function SessionPage({ params }: { params: { id: string } }) {
 
     toast({
       title: "✅ Session ended",
-      description: "Thank you for using Aura Connect",
+      description: "Voice call disconnected. Thank you for using Aura Connect",
     });
 
     // Navigate back to dashboard
     setTimeout(() => {
       router.push(userRole === "student" ? "/student" : "/senior");
     }, 1500);
-  };
-
-  // Handle when voice call ends - also end the session
-  const handleCallEnd = () => {
-    handleEndSession();
   };
 
   const handleFlagContent = () => {
@@ -490,6 +519,17 @@ export default function SessionPage({ params }: { params: { id: string } }) {
         "Our team will review this session. Thank you for keeping the community safe.",
       variant: "destructive",
     });
+  };
+
+  const handleVoiceCallJoined = (daily: any) => {
+    dailyCallRef.current = daily;
+    setIsVoiceActive(true);
+  };
+
+  const handleVoiceCallLeft = () => {
+    dailyCallRef.current = null;
+    setIsVoiceActive(false);
+    setIsMuted(false);
   };
 
   const progressPercent = ((600 - timeRemaining) / 600) * 100;
@@ -510,96 +550,193 @@ export default function SessionPage({ params }: { params: { id: string } }) {
         />
       )}
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-lg font-bold text-white">💬 Active Session</h1>
-            <p className="text-xs text-gray-400">Session ID: {params.id}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Timer */}
-            <div className="text-center">
-              <div
-                className={`text-2xl font-mono font-bold ${
-                  timeRemaining < 60 ? "text-red-400" : "text-white"
-                }`}
-              >
-                {formatTime(timeRemaining)}
-              </div>
-              <Progress value={progressPercent} className="w-32 h-1 mt-1" />
+      <div className="bg-gray-800 border-b border-gray-700 p-3 sm:p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3">
+            <div className="space-y-1 text-center sm:text-left">
+              <h1 className="text-base sm:text-lg font-bold text-white">
+                💬 Active Session
+              </h1>
+              <p className="text-xs text-gray-400">Session ID: {params.id}</p>
             </div>
 
-            {/* Voice Toggle */}
-            <Button
-              onClick={handleToggleVoice}
-              variant={isVoiceActive ? "default" : "outline"}
-              size="sm"
-            >
-              {isVoiceActive ? "📞 Voice On" : "📞 Start Voice"}
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* Timer */}
+              <div className="text-center">
+                <div
+                  className={`text-xl sm:text-2xl font-mono font-bold ${
+                    timeRemaining < 60 ? "text-red-400" : "text-white"
+                  }`}
+                >
+                  {formatTime(timeRemaining)}
+                </div>
+                <Progress
+                  value={progressPercent}
+                  className="w-28 sm:w-32 h-1 mt-1"
+                />
+              </div>
 
-            {/* End Session */}
-            <Button onClick={handleEndSession} variant="destructive" size="sm">
-              End Session
-            </Button>
+              {/* End Session */}
+              <Button
+                onClick={handleEndSession}
+                variant="destructive"
+                size="sm"
+                className="min-h-[44px]"
+              >
+                End Session
+              </Button>
+            </div>
           </div>
+
+          {/* Voice Call Controls */}
+          {callData && (
+            <VoiceCall
+              roomUrl={callData.roomUrl}
+              token={callData.token}
+              userName={userName || "User"}
+              onCallEnd={handleVoiceCallLeft}
+              onCallJoined={handleVoiceCallJoined}
+            />
+          )}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto p-4 h-[calc(100vh-100px)] flex gap-4">
+      <div className="max-w-6xl mx-auto p-3 sm:p-4 h-[calc(100vh-140px)] sm:h-[calc(100vh-100px)] flex flex-col md:flex-row gap-4">
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* AI Icebreaker Card (Phase 8A.1) */}
+        <div className="flex-1 flex flex-col overflow-y-auto md:overflow-y-visible md:min-h-0">
+          {/* AI Icebreaker Card (Phase 8A.1) - Simple card for students, collapsible for seniors */}
           {!icebreakerLoading && icebreaker && (
-            <Card className="mb-4 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-              <CardContent className="pt-4">
-                <div className="flex items-start gap-3">
-                  <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900 mb-1">
-                      💡 AI Conversation Starter
-                    </p>
-                    <p className="text-sm text-gray-700">{icebreaker}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <>
+              {userRole === "student" ? (
+                <Card className="mb-2 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+                  <CardContent className="pt-3 pb-3 px-3">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-1">
+                          💡 Conversation Starter
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-700">
+                          {icebreaker}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Accordion type="single" collapsible className="mb-2">
+                  <AccordionItem value="icebreaker" className="border-none">
+                    <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+                      <AccordionTrigger className="px-3 py-2 hover:no-underline [&[data-state=open]>div]:text-blue-700">
+                        <div className="flex items-center gap-2 transition-colors">
+                          <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                          <span className="text-xs sm:text-sm font-semibold text-blue-900">
+                            💡 Conversation Starter
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <CardContent className="pt-0 pb-3 px-3">
+                          <p className="text-xs sm:text-sm text-gray-700">
+                            {icebreaker}
+                          </p>
+                        </CardContent>
+                      </AccordionContent>
+                    </Card>
+                  </AccordionItem>
+                </Accordion>
+              )}
+            </>
           )}
 
-          {/* Technique Coaching Card (Phase 8B.6) - Only for seniors */}
-          {userRole === "senior" && techniqueCoaching && (
-            <div className="mb-4">
-              <TechniqueCard
-                technique={techniqueCoaching.technique}
-                explanation={techniqueCoaching.explanation}
-                example={techniqueCoaching.example}
-                onUse={handleUseTechnique}
-                onDismiss={handleDismissTechnique}
-              />
-            </div>
-          )}
-
-          {/* Multi-Level Response Selector (Phase 8B.5) - Only for seniors */}
-          {userRole === "senior" &&
-            !responsesLoading &&
-            aiResponses.quickReplies.length > 0 && (
-              <div className="mb-4">
-                <ResponseLevelSelector
-                  quickReplies={aiResponses.quickReplies}
-                  guidedPrompts={aiResponses.guidedPrompts}
-                  aiDraft={aiResponses.aiDraft}
-                  onQuickReplySelect={handleQuickReply}
-                  onGuidedPromptSelect={handleGuidedPrompt}
-                  onDraftSelect={handleDraftSelect}
-                />
-              </div>
-            )}
-
-          {/* Sentiment Meter (Phase 8A.7) - Only for seniors */}
+          {/* Senior AI Features - All in one collapsible accordion */}
           {userRole === "senior" && (
-            <div className="mb-4">
+            <Accordion type="multiple" className="mb-2 space-y-2">
+              {/* Technique Coaching Card (Phase 8B.6) */}
+              {techniqueCoaching && (
+                <AccordionItem value="technique" className="border-none">
+                  <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300">
+                    <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                        <span className="text-xs sm:text-sm font-semibold text-purple-900">
+                          💡 Try: {techniqueCoaching.technique}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <CardContent className="pt-2 pb-3">
+                        <p className="text-xs text-gray-700 mb-2">
+                          {techniqueCoaching.explanation}
+                        </p>
+                        <div className="bg-white rounded-md p-2 mb-2 border border-purple-200">
+                          <p className="text-xs text-purple-600 font-medium mb-1">
+                            Example:
+                          </p>
+                          <p className="text-xs italic text-gray-800">
+                            "{techniqueCoaching.example}"
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-purple-600 hover:bg-purple-700 min-h-[44px] text-xs"
+                            onClick={() =>
+                              handleUseTechnique(techniqueCoaching.example)
+                            }
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Use Example
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="min-h-[44px] min-w-[44px]"
+                            onClick={handleDismissTechnique}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </AccordionContent>
+                  </Card>
+                </AccordionItem>
+              )}
+
+              {/* Multi-Level Response Selector (Phase 8B.5) */}
+              {!responsesLoading && aiResponses.quickReplies.length > 0 && (
+                <AccordionItem value="responses" className="border-none">
+                  <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+                    <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                        <span className="text-xs sm:text-sm font-semibold text-gray-800">
+                          AI Response Assistant
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <CardContent className="pt-2 pb-3">
+                        <ResponseLevelSelector
+                          quickReplies={aiResponses.quickReplies}
+                          guidedPrompts={aiResponses.guidedPrompts}
+                          aiDraft={aiResponses.aiDraft}
+                          onQuickReplySelect={handleQuickReply}
+                          onGuidedPromptSelect={handleGuidedPrompt}
+                          onDraftSelect={handleDraftSelect}
+                        />
+                      </CardContent>
+                    </AccordionContent>
+                  </Card>
+                </AccordionItem>
+              )}
+            </Accordion>
+          )}
+
+          {/* Sentiment Meter (Phase 8A.7) - Only for seniors - Outside accordion, always visible */}
+          {userRole === "senior" && (
+            <div className="mb-2">
               <SentimentMeter
                 messages={messages
                   .filter((msg) => msg.sender !== "system")
@@ -612,9 +749,12 @@ export default function SessionPage({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          <Card className="flex-1 flex flex-col bg-gray-800 border-gray-700">
+          <Card className="flex-1 flex flex-col bg-gray-800 border-gray-700 min-h-[300px] md:min-h-0 max-h-full overflow-hidden">
             {/* Messages */}
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth">
+            <CardContent
+              ref={chatContainerRef}
+              className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 scroll-smooth"
+            >
               {messages.map((message) => {
                 const isMyMessage = message.sender === userRole;
                 const isSystemMessage = message.sender === "system";
@@ -631,12 +771,12 @@ export default function SessionPage({ params }: { params: { id: string } }) {
                     }`}
                   >
                     <div
-                      className={`max-w-[70%] rounded-lg p-3 break-words ${
+                      className={`rounded-lg p-3 break-words ${
                         isSystemMessage
-                          ? "bg-blue-900/50 text-blue-200 text-center text-sm"
+                          ? "max-w-[95%] sm:max-w-[85%] bg-blue-900/50 text-blue-200 text-center text-xs sm:text-sm"
                           : isMyMessage
-                          ? "bg-purple-600 text-white rounded-br-none"
-                          : "bg-gray-700 text-gray-100 rounded-bl-none"
+                          ? "max-w-[85%] sm:max-w-[75%] lg:max-w-[70%] bg-purple-600 text-white rounded-br-none"
+                          : "max-w-[85%] sm:max-w-[75%] lg:max-w-[70%] bg-gray-700 text-gray-100 rounded-bl-none"
                       }`}
                     >
                       <p className="text-sm break-words whitespace-pre-wrap">
@@ -656,16 +796,20 @@ export default function SessionPage({ params }: { params: { id: string } }) {
             </CardContent>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-700">
+            <div className="p-3 sm:p-4 border-t border-gray-700">
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Type your message..."
-                  className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-gray-700 text-white text-sm sm:text-base rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
-                <Button type="submit" size="lg">
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="min-h-[48px] min-w-[48px] px-4"
+                >
                   Send 📤
                 </Button>
               </form>
@@ -673,72 +817,20 @@ export default function SessionPage({ params }: { params: { id: string } }) {
           </Card>
         </div>
 
-        {/* Side Panel */}
-        <div className="w-80 space-y-4">
-          {/* Voice Call Component */}
-          {callData && (
-            <VoiceCall
-              roomUrl={callData.roomUrl}
-              token={callData.token}
-              userName={userName || "User"}
-              onCallEnd={handleCallEnd}
-            />
-          )}
+        {/* Side Panel - Safety & Tips */}
+        <div className="w-full md:w-80 flex flex-col gap-4">
+          {/* Flag Button - Mobile only, compact */}
+          <Button
+            onClick={handleFlagContent}
+            variant="outline"
+            size="sm"
+            className="md:hidden w-full text-red-400 border-red-400 hover:bg-red-900/20"
+          >
+            🚩 Flag Content
+          </Button>
 
-          {/* Loading placeholder (if no call data yet) */}
-          {!callData && (
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm">
-                  🎙️ Voice Call
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-center py-6">
-                  <div className="text-center text-gray-400">
-                    <p className="text-sm">Loading voice call...</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Session Info */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-white text-sm">
-                ℹ️ Session Info
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Time Remaining</span>
-                  <span className="text-white font-mono">
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Connection</span>
-                  <Badge variant="default" className="text-xs">
-                    🟢 Active
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Voice Status</span>
-                  <Badge
-                    variant={isVoiceActive ? "default" : "secondary"}
-                    className="text-xs"
-                  >
-                    {isVoiceActive ? "📞 On" : "💬 Text Only"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Safety */}
-          <Card className="bg-gray-800 border-gray-700">
+          {/* Safety - Desktop only */}
+          <Card className="hidden md:block bg-gray-800 border-gray-700">
             <CardHeader className="pb-3">
               <CardTitle className="text-white text-sm">🛡️ Safety</CardTitle>
             </CardHeader>
@@ -758,8 +850,8 @@ export default function SessionPage({ params }: { params: { id: string } }) {
             </CardContent>
           </Card>
 
-          {/* Tips */}
-          <Card className="bg-blue-900/20 border-blue-700">
+          {/* Tips - Desktop only */}
+          <Card className="hidden md:block bg-blue-900/20 border-blue-700">
             <CardContent className="pt-4">
               <div className="space-y-2 text-xs text-blue-200">
                 <p className="font-semibold">💡 Tips for a great session:</p>

@@ -24,6 +24,7 @@ interface VoiceCallProps {
   token: string;
   userName: string;
   onCallEnd?: () => void;
+  onCallJoined?: (daily: any) => void;
 }
 
 type CallState = "idle" | "joining" | "joined" | "left" | "error";
@@ -53,6 +54,7 @@ export default function VoiceCall({
   token,
   userName,
   onCallEnd,
+  onCallJoined,
 }: VoiceCallProps) {
   const [callState, setCallState] = useState<CallState>("idle");
   const [isMuted, setIsMuted] = useState(false);
@@ -137,6 +139,9 @@ export default function VoiceCall({
       // Enable microphone by default when joining
       daily.setLocalAudio(true);
       setIsMuted(false);
+
+      // Notify parent component that call joined (pass Daily instance)
+      onCallJoined?.(daily);
 
       toast({
         title: "📞 Joined call",

@@ -132,34 +132,36 @@ export default function SentimentMeter({
   const scoreToPercent = sentiment ? ((sentiment.score + 10) / 20) * 100 : 50;
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            📊 Student Sentiment
-            {loading && (
-              <span className="text-xs text-gray-500 animate-pulse">
-                Analyzing...
-              </span>
-            )}
-          </h3>
-          {sentiment && (
-            <p className="text-xs text-gray-600 mt-1">
-              {getLabel(sentiment.score)}
-            </p>
-          )}
-        </div>
-
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs sm:text-sm font-semibold text-gray-900">
+          📊 Student Sentiment
+        </h3>
         {sentiment && (
-          <div className="flex items-center gap-1 text-xs text-gray-700">
+          <div className="flex items-center gap-1">
             {getTrendIcon(sentiment.trend)}
-            <span>{getTrendText(sentiment.trend)}</span>
+            <span className="text-xs sm:text-sm text-gray-600">
+              {getTrendText(sentiment.trend)}
+            </span>
           </div>
+        )}
+        {loading && (
+          <span className="text-xs sm:text-sm text-gray-500 animate-pulse">
+            Analyzing...
+          </span>
         )}
       </div>
 
-      {/* Sentiment Bar */}
-      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
+      {/* Sentiment Label */}
+      {sentiment && (
+        <p className="text-xs sm:text-sm font-medium text-gray-800 mb-2">
+          {getLabel(sentiment.score)}
+        </p>
+      )}
+
+      {/* Compact Sentiment Bar */}
+      <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
         {/* Gradient background */}
         <div className="absolute inset-0 flex" style={{ width: "100%" }}>
           <div className="w-1/7 bg-red-500" />
@@ -178,36 +180,6 @@ export default function SentimentMeter({
             style={{ left: `${scoreToPercent}%` }}
           />
         )}
-      </div>
-
-      {/* Score labels */}
-      <div className="flex justify-between text-xs text-gray-500 mb-2">
-        <span>-10</span>
-        <span>0</span>
-        <span>+10</span>
-      </div>
-
-      {/* Confidence & Indicators */}
-      {sentiment && sentiment.indicators.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-purple-200">
-          <p className="text-xs text-gray-600 mb-1">
-            Key indicators:{" "}
-            <span className="font-medium">
-              {sentiment.indicators.slice(0, 3).join(", ")}
-            </span>
-          </p>
-          <p className="text-xs text-gray-500">
-            Confidence: {Math.round(sentiment.confidence * 100)}%
-          </p>
-        </div>
-      )}
-
-      {/* Helper text */}
-      <div className="mt-3 p-2 bg-blue-50 rounded-md">
-        <p className="text-xs text-gray-700 leading-relaxed">
-          💡 <strong>Tip:</strong> Use this to gauge the student&apos;s
-          emotional state and adjust your responses accordingly.
-        </p>
       </div>
     </div>
   );

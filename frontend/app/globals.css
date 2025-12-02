@@ -165,3 +165,8 @@ body {
   background-size: 200% 200%;
   animation: gradient 3s ease infinite;
 }
+
+/* Smooth scrolling for chat */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}

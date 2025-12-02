@@ -142,20 +142,22 @@ export default function StudentDashboard() {
   }
 
   return (
-    <main className="min-h-screen p-8 bg-gradient-to-br from-purple-50 to-pink-50">
+    <main className="min-h-screen p-3 sm:p-6 lg:p-8 bg-gradient-to-br from-purple-50 to-pink-50">
       {/* Connection Status Indicator */}
       <ConnectionStatus isConnected={isConnected} />
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Header with Welcome & Logout */}
-        <div className="flex justify-between items-center">
-          <div className="text-center flex-1 space-y-2">
-            <h1 className="text-4xl font-bold">👨‍🎓 Student Dashboard</h1>
-            <p className="text-gray-600">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="text-center sm:text-left flex-1 space-y-1 sm:space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
+              👨‍🎓 Student Dashboard
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">
               Welcome back,{" "}
               <span className="font-semibold text-purple-600">{userName}</span>!
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Connect with experienced seniors for support and conversation
             </p>
           </div>
@@ -165,7 +167,7 @@ export default function StudentDashboard() {
               await signOut();
               router.push("/auth/login");
             }}
-            className="ml-4"
+            className="min-h-[44px] w-full sm:w-auto sm:ml-4"
           >
             Log Out
           </Button>
@@ -197,7 +199,7 @@ export default function StudentDashboard() {
                 <Button
                   onClick={handleFindSenior}
                   size="lg"
-                  className="w-full text-lg h-14"
+                  className="w-full text-base sm:text-lg h-14 min-h-[48px]"
                 >
                   🌟 Find a Senior Now
                 </Button>
@@ -297,7 +299,7 @@ export default function StudentDashboard() {
 
         {/* Info Cards */}
         {connectionState === "idle" && (
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">💬 Anonymous & Safe</CardTitle>

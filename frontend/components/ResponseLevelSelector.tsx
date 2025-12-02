@@ -34,27 +34,38 @@ export default function ResponseLevelSelector({
   onDraftSelect,
 }: ResponseLevelSelectorProps) {
   return (
-    <Card className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+    <Card className="p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles className="w-5 h-5 text-purple-600" />
-        <h3 className="font-semibold text-gray-800">AI Response Assistant</h3>
+      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+        <h3 className="text-sm sm:text-base font-semibold text-gray-800">
+          AI Response Assistant
+        </h3>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="quick" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-white/50">
-          <TabsTrigger value="quick" className="text-xs sm:text-sm">
-            <Zap className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Quick</span>
+        <TabsList className="grid w-full grid-cols-3 bg-white/50 h-auto">
+          <TabsTrigger
+            value="quick"
+            className="text-xs sm:text-sm px-2 py-2 min-h-[44px]"
+          >
+            <Zap className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+            <span className="hidden sm:inline ml-1">Quick</span>
           </TabsTrigger>
-          <TabsTrigger value="guided" className="text-xs sm:text-sm">
-            <Edit3 className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Guided</span>
+          <TabsTrigger
+            value="guided"
+            className="text-xs sm:text-sm px-2 py-2 min-h-[44px]"
+          >
+            <Edit3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+            <span className="hidden sm:inline ml-1">Guided</span>
           </TabsTrigger>
-          <TabsTrigger value="draft" className="text-xs sm:text-sm">
-            <FileText className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Draft</span>
+          <TabsTrigger
+            value="draft"
+            className="text-xs sm:text-sm px-2 py-2 min-h-[44px]"
+          >
+            <FileText className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+            <span className="hidden sm:inline ml-1">Draft</span>
           </TabsTrigger>
         </TabsList>
 
@@ -68,10 +79,10 @@ export default function ResponseLevelSelector({
               key={index}
               onClick={() => onQuickReplySelect(reply)}
               variant="outline"
-              className="w-full justify-start text-left h-auto py-2 px-3 hover:bg-purple-100 hover:border-purple-300 transition-all"
+              className="w-full justify-start text-left h-auto min-h-[48px] py-2 px-3 hover:bg-purple-100 hover:border-purple-300 transition-all"
             >
               <Zap className="w-4 h-4 mr-2 text-purple-600 flex-shrink-0" />
-              <span className="text-sm">{reply}</span>
+              <span className="text-xs sm:text-sm">{reply}</span>
             </Button>
           ))}
         </TabsContent>
@@ -86,10 +97,10 @@ export default function ResponseLevelSelector({
               key={index}
               onClick={() => onGuidedPromptSelect(prompt)}
               variant="outline"
-              className="w-full justify-start text-left h-auto py-2 px-3 hover:bg-blue-100 hover:border-blue-300 transition-all"
+              className="w-full justify-start text-left h-auto min-h-[48px] py-2 px-3 hover:bg-blue-100 hover:border-blue-300 transition-all"
             >
               <Edit3 className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0" />
-              <span className="text-sm">{prompt}</span>
+              <span className="text-xs sm:text-sm">{prompt}</span>
             </Button>
           ))}
         </TabsContent>
@@ -102,10 +113,12 @@ export default function ResponseLevelSelector({
           <Button
             onClick={() => onDraftSelect(aiDraft)}
             variant="outline"
-            className="w-full justify-start text-left h-auto py-3 px-3 hover:bg-green-100 hover:border-green-300 transition-all"
+            className="w-full justify-start text-left h-auto min-h-[48px] py-3 px-3 hover:bg-green-100 hover:border-green-300 transition-all"
           >
             <FileText className="w-4 h-4 mr-2 text-green-600 flex-shrink-0 mt-0.5" />
-            <span className="text-sm leading-relaxed">{aiDraft}</span>
+            <span className="text-xs sm:text-sm leading-relaxed">
+              {aiDraft}
+            </span>
           </Button>
         </TabsContent>
       </Tabs>
