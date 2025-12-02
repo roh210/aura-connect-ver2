@@ -45,16 +45,11 @@ Thumbs.db
 .vercel
 .turbo
 
-# Developer Documentation & Learning Guides (local reference only)
-PHASE_*.md
-*_LEARNING_GUIDE.md
-*_SUMMARY.md
-SESSION_MANAGEMENT_GUIDE.md
-VOICE_CALL_TESTING.md
-MATCHING_BUG_FIX.md
+# Documentation (local reference only - keep only README.md public)
+*.md
+!README.md
 
 # Test files
 *.test.html
 socket-test.html
 test-server.js
-SETUP_GUIDE.md
