@@ -65,13 +65,17 @@ interface Env {
  */
 function validateEnv(): Env {
   // List of required environment variables
-  const required = [
-    "OPENROUTER_API_KEY",
-    "DAILY_API_KEY",
-    "FIREBASE_PROJECT_ID",
-    "FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY",
-  ];
+  const required = ["OPENROUTER_API_KEY", "DAILY_API_KEY"];
+
+  // Firebase env vars only required in development (production uses Secret File)
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!isProduction) {
+    required.push(
+      "FIREBASE_PROJECT_ID",
+      "FIREBASE_CLIENT_EMAIL",
+      "FIREBASE_PRIVATE_KEY"
+    );
+  }
 
   // Find missing variables (filter returns array of missing keys)
   const missing = required.filter((key) => !process.env[key]);
@@ -94,9 +98,9 @@ function validateEnv(): Env {
     FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY!,
     DAILY_API_KEY: process.env.DAILY_API_KEY!,
-    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID!,
-    FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL!,
-    FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY!,
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || "",
+    FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || "",
+    FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY || "",
   };
 }
 

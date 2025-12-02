@@ -72,22 +72,31 @@ import { logger } from "./logger";
  */
 
 try {
-  // Parse private key (environment variables escape newlines as \\n)
-  const privateKey = env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
-
   // Initialize Firebase Admin (only if not already initialized)
   if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: env.FIREBASE_PROJECT_ID,
-        clientEmail: env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      }),
-    });
+    // Check if we should use Secret File (production) or env vars (development)
+    const useSecretFile = process.env.NODE_ENV === "production";
 
-    logger.info("✅ Firebase Admin SDK initialized", {
-      project: env.FIREBASE_PROJECT_ID,
-    });
+    if (useSecretFile) {
+      // Production: Use Secret File uploaded to Render
+      admin.initializeApp({
+        credential: admin.credential.cert("/etc/secrets/firebase-key.json"),
+      });
+      logger.info("✅ Firebase Admin SDK initialized from Secret File");
+    } else {
+      // Development: Use environment variables
+      const privateKey = env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: env.FIREBASE_PROJECT_ID,
+          clientEmail: env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+      logger.info("✅ Firebase Admin SDK initialized", {
+        project: env.FIREBASE_PROJECT_ID,
+      });
+    }
   }
 } catch (error) {
   logger.error("❌ Firebase initialization failed", {
