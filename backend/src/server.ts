@@ -81,10 +81,29 @@ app.use(helmet());
  * Evil site tries to call your API using victim's cookies → Blocked by CORS
  */
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? process.env.FRONTEND_URL || "https://aura-connect.com" // Your Railway/Vercel frontend URL
-      : "*", // Allow all origins in development (localhost, etc.)
+  origin: (origin, callback) => {
+    // Development: Allow all origins
+    if (process.env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+
+    // Production: Allow Vercel domains (both production and preview deployments)
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      "https://aura-connect-ver2.vercel.app",
+    ];
+
+    // Also allow any Vercel preview deployment URL
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      (origin.includes("aura-connect-ver2") && origin.includes(".vercel.app"))
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true, // Allow cookies
 };
 app.use(cors(corsOptions));
